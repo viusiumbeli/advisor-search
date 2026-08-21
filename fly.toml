@@ -16,6 +16,8 @@ primary_region = "lhr"
 [env]
   # Loads the demo corpus on first boot so the instance has something to search. Idempotent.
   SPRING_PROFILES_ACTIVE = "seed"
+  # Structured logs where a machine reads them; the local compose keeps the human format.
+  LOGGING_STRUCTURED_FORMAT_CONSOLE = "ecs"
 
 [http_service]
   internal_port = 8080

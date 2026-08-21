@@ -1,0 +1,11 @@
+# The build stage copies exactly: gradle/, gradlew, *.gradle.kts, gradle.properties,
+# models/checksums.sha256 and src/. Everything else is dead weight in the build context —
+# without this file every build uploaded ~250 MB (the local model, build output, .git, notes).
+*
+!gradle/
+!gradlew
+!settings.gradle.kts
+!build.gradle.kts
+!gradle.properties
+!models/checksums.sha256
+!src/

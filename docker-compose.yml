@@ -43,9 +43,12 @@ services:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness || exit 1"]
       interval: 5s
       timeout: 5s
-      # Generous: the first start embeds the whole demo corpus before reporting ready.
-      retries: 40
-      start_period: 20s
+      # 12 x 5s is an honest ceiling for a ~15s startup — a genuinely broken container fails in a
+      # minute instead of being polled for three. start_interval polls every second inside the
+      # start period, so "healthy" lands within ~1s of actual readiness rather than on a 5s tick.
+      retries: 12
+      start_period: 30s
+      start_interval: 1s
 
 volumes:
   pgdata:

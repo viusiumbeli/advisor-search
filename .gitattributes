@@ -1,0 +1,5 @@
+* text=auto
+# A CRLF gradlew fails to execute; pin the scripts that must stay LF even on a Windows clone.
+gradlew text eol=lf
+*.sh text eol=lf
+gradlew.bat text eol=crlf

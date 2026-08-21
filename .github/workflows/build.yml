@@ -1,0 +1,66 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+      # Caches ~/.gradle and validates the wrapper jar checksum; a separate
+      # wrapper-validation step is redundant with v4+.
+      - uses: gradle/actions/setup-gradle@v4
+      # The model is pinned by committed checksums, so the cache key is effectively immutable:
+      # written once, restored forever. This takes huggingface.co off the CI critical path.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            models/model.onnx
+            models/tokenizer.json
+          key: models-${{ hashFiles('models/checksums.sha256') }}
+      # ktlint + the full test suite; Testcontainers uses the runner's Docker daemon.
+      - run: ./gradlew build
+
+  # Publishes the image compose points at, so what a reviewer pulls is provably built from main
+  # rather than hand-pushed from a laptop. SBOM and provenance attestations come along for free.
+  publish-image:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/${{ github.repository }}:latest
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

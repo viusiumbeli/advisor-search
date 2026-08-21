@@ -56,28 +56,6 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 }
 
-// JEP 472: JNI calls from the ONNX Runtime and tokenizer libraries warn on JDK 24+ unless the
-// module is granted native access explicitly.
-val nativeAccess = listOf("--enable-native-access=ALL-UNNAMED")
-
-tasks.withType<Test>().configureEach {
-    useJUnitPlatform()
-    dependsOn(provisionModel)
-    jvmArgs(nativeAccess)
-    // Forwards -Dcandidates=<dir> to the test JVM for the (normally skipped) model comparison
-    // experiment; see ModelSelectionExperiment.
-    systemProperty("candidates", providers.systemProperty("candidates").getOrElse(""))
-    testLogging {
-        events("passed", "failed", "skipped")
-        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
-    }
-}
-
-tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
-    dependsOn(provisionModel)
-    jvmArgs(nativeAccess)
-}
-
 // The 90 MB ONNX model is not committed. It is fetched once from a pinned Hugging Face revision
 // and verified against the committed checksums, so a fresh clone builds without manual steps and
 // a corrupted or swapped download fails the build instead of silently changing every embedding.
@@ -87,6 +65,23 @@ val modelSources =
         "model.onnx" to "onnx/model.onnx",
         "tokenizer.json" to "tokenizer.json",
     )
+
+// An object rather than a script-level function: the task action below must not capture the build
+// script instance, or the configuration cache cannot serialize it.
+object Digest {
+    fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(1 shl 16)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+}
 
 val provisionModel =
     tasks.register("provisionModel") {
@@ -113,7 +108,7 @@ val provisionModel =
             sources.forEach { (fileName, remotePath) ->
                 val target = modelDir.file(fileName).asFile
                 val want = requireNotNull(expected[fileName]) { "No checksum recorded for $fileName" }
-                if (target.exists() && sha256(target) == want) {
+                if (target.exists() && Digest.sha256(target) == want) {
                     logger.lifecycle("models/$fileName is present and matches its checksum")
                     return@forEach
                 }
@@ -123,7 +118,7 @@ val provisionModel =
                 URI(url).toURL().openStream().use { input ->
                     target.outputStream().use { output -> input.copyTo(output) }
                 }
-                val got = sha256(target)
+                val got = Digest.sha256(target)
                 check(got == want) {
                     "Checksum mismatch for models/$fileName: expected $want but got $got. " +
                         "Delete the file and retry; if it persists the upstream revision has changed."
@@ -132,15 +127,38 @@ val provisionModel =
         }
     }
 
-fun sha256(file: File): String {
-    val digest = MessageDigest.getInstance("SHA-256")
-    file.inputStream().use { input ->
-        val buffer = ByteArray(1 shl 16)
-        while (true) {
-            val read = input.read(buffer)
-            if (read < 0) break
-            digest.update(buffer, 0, read)
-        }
+// JEP 472: JNI calls from the ONNX Runtime and tokenizer libraries warn on JDK 24+ unless the
+// module is granted native access explicitly.
+val nativeAccess = listOf("--enable-native-access=ALL-UNNAMED")
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+    dependsOn(provisionModel)
+    jvmArgs(nativeAccess)
+    // Forwards -Dcandidates=<dir> to the test JVM for the (normally skipped) model comparison
+    // experiment; see ModelSelectionExperiment.
+    systemProperty("candidates", providers.systemProperty("candidates").getOrElse(""))
+    testLogging {
+        events("passed", "failed", "skipped")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
-    return digest.digest().joinToString("") { "%02x".format(it) }
+}
+
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    dependsOn(provisionModel)
+    jvmArgs(nativeAccess)
+}
+
+springBoot {
+    // Populates /actuator/info, which is exposed — a deployed instance can say what it is.
+    buildInfo()
+}
+
+tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+    manifest {
+        // JDK 24+ honours this for `java -jar`, so running the jar directly needs no flags.
+        // The container ENTRYPOINT still passes the flag explicitly: the extracted-layout
+        // JarLauncher is not started with -jar and does not read this attribute.
+        attributes("Enable-Native-Access" to "ALL-UNNAMED")
+    }
 }

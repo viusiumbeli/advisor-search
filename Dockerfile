@@ -19,23 +19,39 @@ RUN ./gradlew --no-daemon provisionModel
 COPY src src
 RUN ./gradlew --no-daemon bootJar -x test
 
+# Splitting the fat jar into Boot's layers keeps the ~110 MB of dependencies in their own image
+# layer: a source change re-pushes only the ~1 MB application layer, not the whole jar.
+RUN java -Djarmode=tools -jar build/libs/advisor-search-*.jar extract --layers --launcher --destination extracted
+
 FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
 
-# curl is here for the compose healthcheck, which has to run inside the container.
+# curl exists for the container healthcheck, which has to run inside the container.
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --create-home --uid 10001 advisor
 
-COPY --from=build /workspace/build/libs/advisor-search-*.jar app.jar
+# Most stable layer first; the application layer last so it is the only one that changes often.
+COPY --from=build /workspace/extracted/dependencies/ ./
+COPY --from=build /workspace/extracted/spring-boot-loader/ ./
+COPY --from=build /workspace/extracted/snapshot-dependencies/ ./
+COPY --from=build /workspace/extracted/application/ ./
 COPY --from=build /workspace/models models
 
 USER advisor
 EXPOSE 8080
 
-# MaxRAMPercentage leaves headroom for the ONNX Runtime arenas, which are native memory and sit
-# outside the Java heap. --enable-native-access silences the JEP 472 warning for the JNI calls.
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=65 --enable-native-access=ALL-UNNAMED"
+# Self-describing image: `docker run` gets the same health semantics compose declares.
+# (No --start-interval here: it needs Docker Engine 25+ and is a hard parse error on 24, unlike
+# the compose field of the same name, which older engines simply ignore.)
+HEALTHCHECK --interval=5s --timeout=5s --retries=12 --start-period=30s \
+    CMD curl -fsS http://localhost:8080/actuator/health/readiness || exit 1
 
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+# Flags live in the ENTRYPOINT rather than JAVA_TOOL_OPTIONS: the env var is inherited by every JVM
+# in the container and echoes itself to stderr on each start. MaxRAMPercentage leaves headroom for
+# ONNX Runtime's arenas (native memory outside the Java heap); the native-access flag is JEP 472 —
+# the extracted-layout launcher is not started with -jar, so the jar's manifest attribute
+# equivalent does not apply here.
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=65", "--enable-native-access=ALL-UNNAMED", \
+            "org.springframework.boot.loader.launch.JarLauncher"]
