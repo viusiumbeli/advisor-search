@@ -1,5 +1,7 @@
 # Advisor Search
 
+[![build](https://github.com/viusiumbeli/advisor-search/actions/workflows/build.yml/badge.svg)](https://github.com/viusiumbeli/advisor-search/actions/workflows/build.yml)
+
 A search API over clients and their documents. Clients are matched with trigrams over name, email
 and description; documents are matched twice, once by Postgres full-text search and once by
 embedding similarity, and the two rankings are combined with reciprocal rank fusion.
@@ -249,9 +251,10 @@ maximum rather than blending the probes into one vector matters — averaging "a
 Expansion widens the **semantic arm only**. The lexical arm's value is precision on exact tokens,
 and OR-ing extra phrases into it would trade that away for recall the semantic arm already provides.
 
-It is not free: each probe is another embedding and another scan, so an expanded query takes about
-66 ms against 24 ms for a plain one. That is why the expander caps a query at five probes, and why
-only queries that match a trigger pay anything at all.
+It is not free: the probes are embedded together as one padded batch (one transformer forward pass,
+not five), but each probe is still its own vector scan, so an expanded query takes about 50 ms
+against 24 ms for a plain one. That is why the expander caps a query at five probes, and why only
+queries that match a trigger pay anything at all.
 
 This is the honest version of the trade-off, and its limits are worth stating: a hand-maintained
 lexicon does not generalise, and it is only as good as the person editing it. In a real product this
@@ -358,8 +361,8 @@ clients, 20 documents and 153 chunks.
 | Seeding 20 documents through the real ingest path | 8.8 s |
 | Ingesting the longest document (15,707 chars, 22 chunks) | 757 ms |
 | `GET /search`, one probe, warm | 24 ms median |
-| `GET /search`, 5 expansion probes, warm | 66 ms median |
-| Test suite (60 tests, from clean, no build cache) | 16 s |
+| `GET /search`, 5 expansion probes, warm (batched inference) | 50 ms median |
+| Test suite (66 tests, from clean, no build cache) | 27 s |
 | API container resident memory | 760 to 840 MiB |
 | Image size | 576 MB |
 
@@ -439,6 +442,23 @@ running the project locally needs no credentials. This is a shared secret for a 
 identity system; real multi-tenancy would scope every query by the authenticated advisor's
 organisation, which is a `WHERE` clause through `client_id` rather than a new subsystem.
 
+**The image is layered.** The runtime stage assembles Boot's extracted layers instead of copying
+the fat jar, so the ~110 MB of dependencies live in their own image layer and a source change
+re-pushes about 1 MB. CI publishes the multi-arch image on every push to main with SBOM and
+provenance attestations, which is what `docker compose pull` fetches.
+
+**Scaling ladder.** This system is stage one of three, and each stage's trigger is named rather
+than guessed. Stage one — the current corpus scale — is the exact scan and in-process embedding
+measured above. Stage two, from roughly 50k chunks: the HNSW index whose DDL is above, a floor
+recalibration, async ingest once its p99 criterion trips, and vector quantization near the top end.
+Stage three, tens of millions of rows and up, starts with the domain answer rather than
+infrastructure: advisor search is tenant-scoped, so partitioning by organisation prunes a
+100-million-row table to one advisor's book per query — after which each partition is back at a
+scale this design handles. Only genuinely global search forces dedicated engines (BM25 in
+OpenSearch, a vector store or pgvectorscale) and a batched GPU embedding service; at that point the
+request profile inverts from CPU-bound to I/O-bound and virtual threads turn on with one property
+(see below). You scale by changing the retrieval architecture, not by swapping the web framework.
+
 ---
 
 ## Deploying it
@@ -502,15 +522,44 @@ would look like.
 - **Elasticsearch.** A second stateful service to run and keep in sync, for no recall this corpus
   can demonstrate. Postgres already has both retrieval modes.
 - **Searching `social_links`.** `array_to_string` is `STABLE`, not `IMMUTABLE`, so it cannot go in
-  the generated column. The escape hatch is an `IMMUTABLE` wrapper plus PostgreSQL 17's
-  `ALTER TABLE … ALTER COLUMN … SET EXPRESSION AS`.
+  the generated column. The escape hatch is an `IMMUTABLE` wrapper plus
+  `ALTER TABLE … ALTER COLUMN … SET EXPRESSION AS` (PostgreSQL 17+).
 - **`unaccent`.** The corpus is English; accented names are reachable by trigram similarity. Adding
   it means an `unaccent`-based `IMMUTABLE` wrapper in the generated column.
 - **Partial tokens inside document content.** "PLC-88" will not find `PLC-88213`; a trigram index on
   content would fix it at the cost of a second large index.
 - **Update and delete, pagination, synonym dictionaries, Prometheus metrics.** Not needed to
   demonstrate search. Metrics in particular are two Micrometer timers through the actuator that is
-  already present.
+  already present — and if they are ever added, the one thing not to do is tag them with the query
+  string: `q` is unbounded user input over a corpus of client PII, so a `query` tag is a cardinality
+  explosion in the metrics backend and a data-protection problem at once.
+- **Virtual threads.** The 2026 default for a blocking Spring MVC app — deliberately off here.
+  JDK 24 removed pinning on `synchronized` (JEP 491), which killed the classic objection, but a JNI
+  downcall still pins its carrier with no scheduler compensation, and this request *is* a JNI
+  downcall: ~90% of search latency is ONNX inference. On the deploy's single vCPU one in-flight
+  search would pin the only carrier and starve the readiness probe, and Tomcat's bounded pool is
+  currently the service's only admission control. The flag is one line; what it would optimize —
+  waiting — is not what this service does. The reversal trigger is stage three of the scaling
+  ladder above: embedding moves out of process, the profile inverts to I/O-bound, the property
+  goes on.
+- **WebFlux / coroutines.** Same root sentence: reactive converts waiting into suspension, and
+  there is almost no waiting here (~2–3 ms of JDBC in a 24–50 ms request; capacity is bounded by
+  inference FLOPs regardless of dispatcher). Going reactive would force an R2DBC rewrite of the
+  data layer — no `JdbcClient` equivalent, a hand-written codec for the `vector` type, and Flyway
+  still needs the JDBC driver, so two drivers and two transaction models — while the blocking JNI
+  inference gets wrapped back onto a thread pool anyway. Suspending controllers are WebFlux-only,
+  so there is no coroutines-on-MVC middle path. Post-virtual-threads, reactive earns its keep in
+  streaming and high-fan-out services; this is neither.
+- **An ORM, Spring Data, or jOOQ.** `JdbcClient` is Spring's 2023 API for exactly this shape of
+  service — the SQL is the product here (`DISTINCT ON` over a KNN subquery, `ts_headline`,
+  `word_similarity`, a transaction-local `set_config`), and every abstraction degenerates to
+  native-SQL strings for these queries while adding machinery for the two trivial inserts. jOOQ is
+  the escalation path if this grew to dozens of typed queries; Spring Data JDBC is the addition if
+  CRUD aggregates ever dominate. Both are additions, not rewrites.
+- **A CDS/AOT training run in the image.** Needs a live database inside `docker build` (Flyway
+  migrates during context refresh), breaks the `$BUILDPLATFORM` multi-arch design by forcing the
+  training pass under QEMU, and would shave ~1 s off a 20 s number — on a platform that suspends
+  and resumes machines rather than cold-starting the JVM.
 
 ---
 
@@ -522,9 +571,16 @@ would look like.
 ./gradlew bootRun        # against a local Postgres; provisions the model first if needed
 ```
 
-Requires JDK 25 and Docker. Integration tests share one pgvector container through a cached Spring
+Requires Docker; the JDK does not need to be installed — the toolchain resolver provisions JDK 25
+automatically on the first build. Gradle's configuration cache is on, so repeat invocations skip
+configuration entirely. Integration tests share one pgvector container through a cached Spring
 context; only the API key test, which changes properties, gets a context and container of its own.
 Without that sharing the suite would start Postgres once per test class.
+
+CI builds every push and pull request (lint, full suite against real Postgres, image build), with
+the model cached under its committed checksum key so huggingface.co is not on the critical path.
+Pushes to main publish the multi-arch image that `docker compose pull` fetches, with SBOM and
+provenance attestations.
 
 Layout: `embedding/` is the tokenizer, ONNX encoder and chunker; `clients/` and `documents/` are the
 write path; `search/` holds the three retrievers, the query expander and the fusion; `seed/` loads
