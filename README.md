@@ -451,12 +451,20 @@ grace period, because the first boot embeds the demo corpus before reporting rea
 The image `docker compose pull` fetches is published from this repository:
 
 ```bash
+docker buildx create --name multiarch --driver docker-container --use   # once; the default
+                                                                       # driver cannot do multi-arch
+echo "$GITHUB_TOKEN" | docker login ghcr.io -u viusiumbeli --password-stdin
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ghcr.io/viusiumbeli/advisor-search:latest --push .
 ```
 
-It exists so a reviewer never has to build. `docker compose up` on its own still builds locally, so
-the repository does not depend on the registry being reachable.
+The build stage is pinned to `$BUILDPLATFORM`, so the Gradle build runs once on the host
+architecture rather than once per target under emulation: both images together take about 100
+seconds instead of the ten-plus minutes a naive multi-architecture build would spend emulating a
+JDK. Only the small runtime stage is built per architecture.
+
+The image exists so a reviewer never has to build. `docker compose up` on its own still builds
+locally, so the repository never depends on the registry being reachable.
 
 ---
 

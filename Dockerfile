@@ -1,7 +1,12 @@
 # The build stage downloads the embedding model once and the runtime stage carries it in the image.
 # Nothing is fetched at container start: ONNX Runtime and the tokenizer both ship their native
 # libraries inside their jars, so a running container needs no network beyond Postgres.
-FROM eclipse-temurin:25-jdk AS build
+#
+# The build stage is pinned to the builder's own architecture. Its outputs — a jar and the model
+# files — are architecture independent, so there is nothing to gain from emulating a foreign
+# architecture through QEMU to produce them, and a multi-architecture build would otherwise spend
+# minutes doing exactly that.
+FROM --platform=$BUILDPLATFORM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace
 
 # Dependencies and the model resolve from the build files alone, so editing source does not
