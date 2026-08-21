@@ -1,6 +1,6 @@
 services:
   db:
-    image: pgvector/pgvector:pg17
+    image: pgvector/pgvector:pg18
     environment:
       POSTGRES_USER: advisor
       POSTGRES_PASSWORD: advisor
@@ -8,7 +8,9 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # Postgres 18 images moved the data directory and want the mount one level up
+      # (/var/lib/postgresql, not .../data); the old mount point makes the container refuse to start.
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U advisor -d advisor_search"]
       interval: 2s

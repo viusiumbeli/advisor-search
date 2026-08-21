@@ -423,6 +423,16 @@ but not a space, and comparing them produces confident nonsense rather than an e
 **Extensions.** `CREATE EXTENSION vector` needs a superuser the first time (`pg_trgm` is trusted).
 The compose user is one; managed providers allow both from their extension whitelist.
 
+**Ids and field bounds.** Primary keys default to Postgres 18's native `uuidv7()`: the leading 48
+bits are a unix-ms timestamp, so ids are time-ordered and primary-key inserts stay append-mostly
+instead of scattering across the B-tree the way fully random v4 ids do — that locality is why the
+project's Postgres floor is 18. Field bounds are enforced twice: the API validates first and
+returns per-field 400s, and the schema carries matching `varchar` limits plus named `CHECK`
+constraints (non-blank names, the 100,000-character content ceiling) as the backstop for any writer
+that is not the API. The content cap is a `CHECK` rather than a `varchar` because it mirrors the
+configurable `ingest.max-content-length`. `SchemaConstraintTest` proves all of it with raw SQL that
+bypasses the API.
+
 **Authentication.** Setting `API_KEY` turns on an `X-API-Key` filter on every endpoint except the
 health probes and the API documentation. Unset — the compose default — the filter does nothing, so
 running the project locally needs no credentials. This is a shared secret for a demo API, not a user
@@ -433,8 +443,9 @@ organisation, which is a `WHERE` clause through `client_id` rather than a new su
 
 ## Deploying it
 
-`fly.toml` deploys the same image to Fly.io against any managed Postgres that offers `pgvector` and
-`pg_trgm` — the migration creates both on first start.
+`fly.toml` deploys the same image to Fly.io against any managed Postgres — version 18 or later,
+since the schema uses the native `uuidv7()` — that offers `pgvector` and `pg_trgm`; the migration
+creates both extensions on first start.
 
 ```bash
 fly launch --no-deploy --copy-config
