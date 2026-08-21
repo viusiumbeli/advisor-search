@@ -85,12 +85,12 @@ class SearchService(
      * its own, whereas the maximum lets whichever phrasing actually describes the document win.
      */
     private fun findSemantically(query: String): List<DocumentMatch> {
-        val probes = expander.expand(query)
+        // All probes are embedded in one padded batch — one forward pass, not one per probe.
         val best =
-            probes
-                .flatMap { probe ->
-                    documents.semanticSearch(embeddings.embedQuery(probe), properties.candidateChunks)
-                }.bestByDocument()
+            embeddings
+                .embedQueries(expander.expand(query))
+                .flatMap { vector -> documents.semanticSearch(vector, properties.candidateChunks) }
+                .bestByDocument()
 
         // Both floors are applied here, while the numbers are still cosine similarities. After
         // fusion there are only ranks, and "not similar enough" cannot be expressed as a rank.

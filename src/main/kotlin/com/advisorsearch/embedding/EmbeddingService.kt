@@ -28,6 +28,13 @@ class EmbeddingService(
     fun embedQuery(query: String): FloatArray = embedder.embed(query)
 
     /**
+     * Embeds several query probes as one padded batch: five expansion probes cost one transformer
+     * forward pass instead of five. Padding is masked out of the mean pooling, so the vectors are
+     * the same ones the texts would get individually.
+     */
+    fun embedQueries(queries: List<String>): List<FloatArray> = embedder.embedAll(queries)
+
+    /**
      * Embeds a document's chunks in one batched call.
      *
      * Each chunk is embedded with its document title prepended. A chunk pulled from the middle of a

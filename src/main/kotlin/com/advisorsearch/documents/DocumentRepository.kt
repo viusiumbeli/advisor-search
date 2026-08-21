@@ -1,19 +1,15 @@
 package com.advisorsearch.documents
 
 import com.advisorsearch.support.toVectorLiteral
-import org.springframework.jdbc.core.BatchPreparedStatementSetter
-import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
-import java.sql.PreparedStatement
 import java.util.UUID
 import kotlin.jvm.optionals.getOrNull
 
 @Repository
 class DocumentRepository(
     private val jdbc: JdbcClient,
-    private val jdbcTemplate: JdbcTemplate,
 ) {
     /**
      * Writes the document and all of its chunks in one transaction, so a document is never
@@ -45,26 +41,21 @@ class DocumentRepository(
                 .query(Document::class.java)
                 .single()
 
-        jdbcTemplate.batchUpdate(
-            """
-            INSERT INTO document_chunks (document_id, chunk_index, content, embedding, embedding_model)
-            VALUES (?, ?, ?, CAST(? AS vector), ?)
-            """.trimIndent(),
-            object : BatchPreparedStatementSetter {
-                override fun getBatchSize(): Int = chunks.size
-
-                override fun setValues(
-                    statement: PreparedStatement,
-                    index: Int,
-                ) {
-                    statement.setObject(1, document.id)
-                    statement.setInt(2, index)
-                    statement.setString(3, chunks[index])
-                    statement.setString(4, embeddings[index].toVectorLiteral())
-                    statement.setString(5, modelId)
-                }
-            },
-        )
+        // One set-based statement instead of a JDBC batch: the chunks and their vectors travel as
+        // two parallel arrays and Postgres unrolls them server-side, so a 22-chunk document is one
+        // round trip. WITH ORDINALITY numbers the elements, which is exactly chunk_index + 1.
+        jdbc
+            .sql(
+                """
+                INSERT INTO document_chunks (document_id, chunk_index, content, embedding, embedding_model)
+                SELECT :documentId, i - 1, c, CAST(v AS vector), :modelId
+                FROM unnest(CAST(:contents AS text[]), CAST(:vectors AS text[])) WITH ORDINALITY AS t(c, v, i)
+                """.trimIndent(),
+            ).param("documentId", document.id)
+            .param("contents", chunks.toTypedArray())
+            .param("vectors", embeddings.map { it.toVectorLiteral() }.toTypedArray())
+            .param("modelId", modelId)
+            .update()
         return document
     }
 
