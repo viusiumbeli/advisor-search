@@ -7,6 +7,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.TestConstructor
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 
@@ -34,4 +35,7 @@ class TestDatabase {
 @AutoConfigureMockMvc
 @Import(TestDatabase::class)
 @ActiveProfiles("test")
+// Inherited by every subclass: constructor parameters are autowired without nine per-class
+// @Autowired annotations (and without the extra indentation level they force on Kotlin classes).
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 abstract class IntegrationTest
