@@ -34,12 +34,6 @@ class Chunker(
         require(overlapTokens in 0..<budgetTokens) { "Overlap must be smaller than the chunk budget" }
     }
 
-    private data class Piece(
-        val text: String,
-        val separator: String,
-        val tokens: Int,
-    )
-
     fun chunk(content: String): List<String> {
         val trimmed = content.trim()
         if (trimmed.isEmpty()) return emptyList()
@@ -47,7 +41,7 @@ class Chunker(
 
         val pieces = split(trimmed)
         val chunks = mutableListOf<String>()
-        var current = mutableListOf<Piece>()
+        var current = mutableListOf<ChunkPiece>()
         var tokens = 0
         var chars = 0
 
@@ -74,8 +68,8 @@ class Chunker(
      * boundary is still whole in at least one chunk. Never carries the entire chunk over: that would
      * make no progress and loop forever.
      */
-    private fun carryOver(emitted: List<Piece>): MutableList<Piece> {
-        val carried = mutableListOf<Piece>()
+    private fun carryOver(emitted: List<ChunkPiece>): MutableList<ChunkPiece> {
+        val carried = mutableListOf<ChunkPiece>()
         var tokens = 0
         for (piece in emitted.asReversed()) {
             if (carried.size == emitted.size - 1) break
@@ -86,7 +80,7 @@ class Chunker(
         return carried
     }
 
-    private fun render(pieces: List<Piece>): String =
+    private fun render(pieces: List<ChunkPiece>): String =
         buildString {
             pieces.forEachIndexed { index, piece ->
                 if (index > 0) append(piece.separator)
@@ -101,13 +95,13 @@ class Chunker(
      * substring of the document, so a snippet quotes the source exactly instead of a
      * whitespace-normalised approximation of it.
      */
-    private fun split(content: String): List<Piece> {
-        val pieces = mutableListOf<Piece>()
+    private fun split(content: String): List<ChunkPiece> {
+        val pieces = mutableListOf<ChunkPiece>()
         var separator = ""
         forEachSegment(content, PARAGRAPH_BREAK) { paragraph, nextSeparator ->
             if (paragraph.isNotEmpty()) {
                 if (fits(paragraph)) {
-                    pieces += Piece(paragraph, separator, tokenizer.count(paragraph))
+                    pieces += ChunkPiece(paragraph, separator, tokenizer.count(paragraph))
                 } else {
                     splitSentences(paragraph).forEachIndexed { position, sentence ->
                         pieces += if (position == 0) sentence.copy(separator = separator) else sentence
@@ -119,12 +113,12 @@ class Chunker(
         return pieces
     }
 
-    private fun splitSentences(paragraph: String): List<Piece> {
-        val pieces = mutableListOf<Piece>()
+    private fun splitSentences(paragraph: String): List<ChunkPiece> {
+        val pieces = mutableListOf<ChunkPiece>()
         var separator = " "
         forEachSegment(paragraph, SENTENCE_BREAK) { sentence, nextSeparator ->
             if (sentence.isNotEmpty()) {
-                val split = if (fits(sentence)) listOf(Piece(sentence, separator, tokenizer.count(sentence))) else hardSplit(sentence)
+                val split = if (fits(sentence)) listOf(ChunkPiece(sentence, separator, tokenizer.count(sentence))) else hardSplit(sentence)
                 split.forEachIndexed { position, piece ->
                     pieces += if (position == 0) piece.copy(separator = separator) else piece
                 }
@@ -154,8 +148,8 @@ class Chunker(
      * piece against the tokenizer, shrinking until it genuinely fits rather than trusting a
      * characters-per-token estimate.
      */
-    private fun hardSplit(text: String): List<Piece> {
-        val pieces = mutableListOf<Piece>()
+    private fun hardSplit(text: String): List<ChunkPiece> {
+        val pieces = mutableListOf<ChunkPiece>()
         var remaining = text
         var separator = " "
         while (remaining.isNotEmpty()) {
@@ -164,7 +158,7 @@ class Chunker(
                 candidate = cutAt(remaining, candidate.length / 2)
             }
             val piece = candidate.trim()
-            if (piece.isNotEmpty()) pieces += Piece(piece, separator, tokenizer.count(piece))
+            if (piece.isNotEmpty()) pieces += ChunkPiece(piece, separator, tokenizer.count(piece))
             val rest = remaining.substring(candidate.length)
             // Only rejoin with a space where the source had whitespace; a cut made mid-token must
             // not gain a separator it never had.

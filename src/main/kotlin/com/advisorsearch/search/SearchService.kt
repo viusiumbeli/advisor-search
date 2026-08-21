@@ -2,6 +2,10 @@ package com.advisorsearch.search
 
 import com.advisorsearch.config.SearchProperties
 import com.advisorsearch.embedding.EmbeddingService
+import com.advisorsearch.search.expansion.QueryExpander
+import com.advisorsearch.search.ranking.FusedDocument
+import com.advisorsearch.search.ranking.RankedList
+import com.advisorsearch.search.ranking.ReciprocalRankFusion
 import com.advisorsearch.support.WHITESPACE_RUN
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -113,8 +117,8 @@ class SearchService(
         val fused =
             ReciprocalRankFusion.fuse(
                 listOf(
-                    ReciprocalRankFusion.RankedList(KEYWORD, keyword.map { it.reference.id }),
-                    ReciprocalRankFusion.RankedList(SEMANTIC, semantic.map { it.reference.id }),
+                    RankedList(KEYWORD, keyword.map { it.reference.id }),
+                    RankedList(SEMANTIC, semantic.map { it.reference.id }),
                 ),
                 properties.rrfK,
             )
@@ -131,7 +135,7 @@ class SearchService(
                 val match = byId.getValue(item.id)
                 Triple(item, match, if (item.sources.size > 1) "both" else item.sources.first())
             }.sortedWith(
-                compareByDescending<Triple<ReciprocalRankFusion.Fused, DocumentMatch, String>> { it.first.score }
+                compareByDescending<Triple<FusedDocument, DocumentMatch, String>> { it.first.score }
                     .thenBy { EVIDENCE_ORDER.indexOf(it.third) }
                     .thenBy { it.second.reference.title }
                     .thenBy { it.second.reference.id },

@@ -19,17 +19,6 @@ class SearchQualityTest(
     private val service: SearchService,
     objectMapper: ObjectMapper,
 ) : SeededIntegrationTest() {
-    data class GoldenQuery(
-        val query: String,
-        val expect: String,
-        val why: String,
-    )
-
-    data class GoldenSet(
-        val documents: List<GoldenQuery>,
-        val clients: List<GoldenQuery>,
-    )
-
     private val golden: GoldenSet = objectMapper.readValue(ClassPathResource("golden-queries.json").inputStream)
 
     @Test

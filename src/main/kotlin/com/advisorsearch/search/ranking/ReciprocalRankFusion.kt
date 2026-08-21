@@ -1,4 +1,4 @@
-package com.advisorsearch.search
+package com.advisorsearch.search.ranking
 
 import java.util.UUID
 
@@ -15,21 +15,10 @@ import java.util.UUID
  * "not similar enough" is no longer expressible.
  */
 object ReciprocalRankFusion {
-    data class RankedList(
-        val source: String,
-        val ids: List<UUID>,
-    )
-
-    data class Fused(
-        val id: UUID,
-        val score: Double,
-        val sources: Set<String>,
-    )
-
     fun fuse(
         lists: List<RankedList>,
         k: Int,
-    ): List<Fused> {
+    ): List<FusedDocument> {
         require(k > 0) { "k must be positive" }
         val scores = mutableMapOf<UUID, Double>()
         val sources = mutableMapOf<UUID, MutableSet<String>>()
@@ -44,7 +33,7 @@ object ReciprocalRankFusion {
 
         // Ties are broken by id so that two runs over the same data return the same order.
         return scores.entries
-            .map { (id, score) -> Fused(id, score, sources.getValue(id)) }
-            .sortedWith(compareByDescending<Fused> { it.score }.thenBy { it.id })
+            .map { (id, score) -> FusedDocument(id, score, sources.getValue(id)) }
+            .sortedWith(compareByDescending<FusedDocument> { it.score }.thenBy { it.id })
     }
 }

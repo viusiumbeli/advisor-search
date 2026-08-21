@@ -3,6 +3,7 @@ package com.advisorsearch.search
 import com.advisorsearch.SeededIntegrationTest
 import com.advisorsearch.config.SearchProperties
 import com.advisorsearch.embedding.EmbeddingService
+import com.advisorsearch.search.expansion.QueryExpander
 import org.junit.jupiter.api.Test
 import kotlin.test.assertTrue
 

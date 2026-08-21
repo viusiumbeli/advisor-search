@@ -1,4 +1,4 @@
-package com.advisorsearch.search
+package com.advisorsearch.search.expansion
 
 import com.advisorsearch.support.WHITESPACE_RUN
 import org.slf4j.LoggerFactory
@@ -31,19 +31,9 @@ private const val MAX_PROBES = 5
 class QueryExpander(
     objectMapper: ObjectMapper,
 ) {
-    data class Lexicon(
-        val rules: List<Rule> = emptyList(),
-    )
-
-    data class Rule(
-        val concept: String,
-        val triggers: List<String>,
-        val expansions: List<String>,
-    )
-
-    private val rules: List<Rule> =
+    private val rules: List<ExpansionRule> =
         objectMapper
-            .readValue(ClassPathResource(LEXICON).inputStream, Lexicon::class.java)
+            .readValue(ClassPathResource(LEXICON).inputStream, ExpansionLexicon::class.java)
             .rules
             .map { rule -> rule.copy(triggers = rule.triggers.map(::normalise)) }
 

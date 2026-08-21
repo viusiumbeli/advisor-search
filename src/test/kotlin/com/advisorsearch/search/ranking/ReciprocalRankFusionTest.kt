@@ -1,6 +1,5 @@
-package com.advisorsearch.search
+package com.advisorsearch.search.ranking
 
-import com.advisorsearch.search.ReciprocalRankFusion.RankedList
 import org.junit.jupiter.api.Test
 import java.util.UUID
 import kotlin.math.abs

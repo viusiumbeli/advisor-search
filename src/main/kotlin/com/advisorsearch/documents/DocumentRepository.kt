@@ -80,7 +80,7 @@ class DocumentRepository(
     fun centralChunks(
         documentId: UUID,
         count: Int,
-    ): List<DocumentSummary.Passage> =
+    ): List<SummaryPassage> =
         jdbc
             .sql(
                 """
@@ -96,7 +96,7 @@ class DocumentRepository(
                 """.trimIndent(),
             ).param("id", documentId)
             .param("count", count)
-            .query(DocumentSummary.Passage::class.java)
+            .query(SummaryPassage::class.java)
             .list()
             .filterNotNull()
 

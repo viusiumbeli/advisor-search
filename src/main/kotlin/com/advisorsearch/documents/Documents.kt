@@ -45,11 +45,5 @@ data class DocumentSummary(
     val title: String,
     val method: String,
     val chunkCount: Int,
-    val passages: List<Passage>,
-) {
-    data class Passage(
-        val chunkIndex: Int,
-        val text: String,
-        val centrality: Double,
-    )
-}
+    val passages: List<SummaryPassage>,
+)

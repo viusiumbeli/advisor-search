@@ -5,6 +5,7 @@ import com.advisorsearch.clients.CreateClientRequest
 import com.advisorsearch.documents.CreateDocumentRequest
 import com.advisorsearch.documents.DocumentRepository
 import com.advisorsearch.documents.DocumentService
+import com.advisorsearch.seed.corpus.Corpus
 import org.slf4j.LoggerFactory
 import org.springframework.core.io.ClassPathResource
 import org.springframework.stereotype.Service
@@ -34,30 +35,6 @@ class SeedService(
     private val documentService: DocumentService,
     private val objectMapper: ObjectMapper,
 ) {
-    data class Corpus(
-        val clients: List<SeedClient>,
-    )
-
-    data class SeedClient(
-        val firstName: String,
-        val lastName: String,
-        val email: String,
-        val description: String,
-        val socialLinks: List<String> = emptyList(),
-        val documents: List<SeedDocument> = emptyList(),
-    )
-
-    data class SeedDocument(
-        val title: String,
-        val file: String,
-    )
-
-    data class SeedSummary(
-        val clientsCreated: Int,
-        val documentsCreated: Int,
-        val skipped: Int,
-    )
-
     fun seed(): SeedSummary {
         val corpus: Corpus = objectMapper.readValue(ClassPathResource(CORPUS).inputStream)
         val started = TimeSource.Monotonic.markNow()

@@ -28,23 +28,13 @@ import kotlin.math.sqrt
  * README under "Why the task's own example needs more than a model".
  */
 class ModelSelectionExperiment {
-    private enum class Pooling { MEAN, CLS }
-
-    private data class Candidate(
-        val name: String,
-        val dir: String,
-        val pooling: Pooling,
-        val queryPrefix: String = "",
-        val passagePrefix: String = "",
-    )
-
     private val candidates =
         listOf(
-            Candidate("all-MiniLM-L6-v2 (current)", "baseline", Pooling.MEAN),
-            Candidate("multi-qa-MiniLM-L6-cos-v1", "multiqa", Pooling.MEAN),
-            Candidate("msmarco-MiniLM-L6-cos-v5", "msmarco", Pooling.MEAN),
-            Candidate("e5-small-v2", "e5small", Pooling.MEAN, "query: ", "passage: "),
-            Candidate("bge-small-en-v1.5", "bgesmall", Pooling.CLS, "Represent this sentence for searching relevant passages: "),
+            CandidateModel("all-MiniLM-L6-v2 (current)", "baseline", Pooling.MEAN),
+            CandidateModel("multi-qa-MiniLM-L6-cos-v1", "multiqa", Pooling.MEAN),
+            CandidateModel("msmarco-MiniLM-L6-cos-v5", "msmarco", Pooling.MEAN),
+            CandidateModel("e5-small-v2", "e5small", Pooling.MEAN, "query: ", "passage: "),
+            CandidateModel("bge-small-en-v1.5", "bgesmall", Pooling.CLS, "Represent this sentence for searching relevant passages: "),
         )
 
     private val probes =
