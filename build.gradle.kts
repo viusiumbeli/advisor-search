@@ -1,4 +1,4 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.springframework.boot.gradle.plugin.SpringBootPlugin
 import java.net.URI
 import java.security.MessageDigest
 
@@ -14,10 +14,6 @@ version = "0.1.0"
 
 kotlin {
     jvmToolchain(25)
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_25)
-        freeCompilerArgs.add("-Xjsr305=strict")
-    }
 }
 
 repositories {
@@ -25,7 +21,11 @@ repositories {
 }
 
 dependencies {
-    implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.1"))
+    // The Boot BOM imports kotlin-bom at Boot's own Kotlin version, which would quietly pin the
+    // version-less stdlib/reflect/test artifacts below the 2.4.10 compiler this build uses.
+    // Declaring the Kotlin BOM first keeps the compiler and the runtime libraries aligned.
+    implementation(platform(kotlin("bom")))
+    implementation(platform(SpringBootPlugin.BOM_COORDINATES))
 
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
