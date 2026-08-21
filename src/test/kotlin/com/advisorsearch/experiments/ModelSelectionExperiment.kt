@@ -14,24 +14,6 @@ import kotlin.io.path.listDirectoryEntries
 import kotlin.math.sqrt
 
 /**
- * How a candidate model turns token vectors into one sentence vector. Each checkpoint documents
- * which it was trained with, and using the wrong one silently degrades every similarity.
- */
-private enum class Pooling { MEAN, CLS }
-
-/**
- * One embedding model under comparison, with the pooling and prefixes its own model card specifies —
- * an asymmetric model scored without its query prefix would be measured unfairly.
- */
-private data class CandidateModel(
-    val name: String,
-    val dir: String,
-    val pooling: Pooling,
-    val queryPrefix: String = "",
-    val passagePrefix: String = "",
-)
-
-/**
  * The experiment behind the decision to add a query expansion lexicon rather than reach for a bigger
  * embedding model. It ranks every seeded document against a set of probe queries, once per candidate
  * model, using each model's own documented pooling and query prefix.

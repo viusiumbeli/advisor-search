@@ -6,35 +6,11 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.HttpStatusCode
 import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
-import org.springframework.web.ErrorResponseException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.context.request.WebRequest
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler
-import java.util.UUID
-
-/**
- * Domain exceptions are `ErrorResponseException`s, so Spring renders them as RFC 9457
- * `application/problem+json` on its own — no advice method per exception type.
- */
-class ResourceNotFoundException(
-    resource: String,
-    id: UUID,
-) : ErrorResponseException(HttpStatus.NOT_FOUND, problem(HttpStatus.NOT_FOUND, "Not found", "$resource $id was not found"), null)
-
-class InvalidRequestException(
-    message: String,
-) : ErrorResponseException(HttpStatus.BAD_REQUEST, problem(HttpStatus.BAD_REQUEST, "Invalid request", message), null)
-
-private fun problem(
-    status: HttpStatus,
-    title: String,
-    detail: String,
-): ProblemDetail =
-    ProblemDetail.forStatusAndDetail(status, detail).apply {
-        this.title = title
-    }
 
 /**
  * The two cases the framework cannot render well on its own.

@@ -10,16 +10,6 @@ private const val ESTIMATED_CHARS_PER_TOKEN = 4
 private const val MAX_CHARS_PER_TOKEN = 12
 
 /**
- * One indivisible span of text plus the whitespace that preceded it, so a rendered chunk reproduces
- * the document exactly. Private to this file: it is an implementation detail of [Chunker].
- */
-private data class ChunkPiece(
-    val text: String,
-    val separator: String,
-    val tokens: Int,
-)
-
-/**
  * Splits document text into overlapping pieces that fit the encoder's window.
  *
  * Boundaries are tried in order of how much meaning they preserve: paragraph, then sentence, then a

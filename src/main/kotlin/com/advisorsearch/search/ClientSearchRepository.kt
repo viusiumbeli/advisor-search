@@ -1,6 +1,5 @@
 package com.advisorsearch.search
 
-import com.advisorsearch.clients.Client
 import com.advisorsearch.clients.toClient
 import com.advisorsearch.support.escapeLikeWildcards
 import org.springframework.jdbc.core.simple.JdbcClient
@@ -43,12 +42,6 @@ private val SUBSTRING_AND_FUZZY =
         "GREATEST($SUBSTRING_SCORE, word_similarity(:query, search_text))",
         "search_text LIKE :pattern ESCAPE '\\' OR :query <% search_text",
     )
-
-data class ClientMatch(
-    val client: Client,
-    val score: Double,
-    val matchedOn: String,
-)
 
 /**
  * Clients are found with trigrams, not full-text search.
