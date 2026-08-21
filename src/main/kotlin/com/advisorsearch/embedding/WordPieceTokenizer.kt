@@ -5,18 +5,16 @@ import java.nio.file.Path
 
 /**
  * Tokenized text ready for the encoder, padded to a common length across the batch.
+ * Deliberately not a data class: the array fields make generated value semantics wrong, and
+ * nothing compares or copies batches.
  */
-data class TokenizedBatch(
+class TokenizedBatch(
     val inputIds: Array<LongArray>,
     val attentionMask: Array<LongArray>,
     val tokenTypeIds: Array<LongArray>,
 ) {
     val size: Int get() = inputIds.size
     val sequenceLength: Int get() = if (inputIds.isEmpty()) 0 else inputIds[0].size
-
-    override fun equals(other: Any?): Boolean = this === other
-
-    override fun hashCode(): Int = System.identityHashCode(this)
 }
 
 /**
@@ -50,14 +48,10 @@ class WordPieceTokenizer(
     /** Wordpieces in [text], excluding the [CLS]/[SEP] the encoder adds later. */
     fun count(text: String): Int = counter.encode(text).ids.size
 
-    /** Wordpieces of [text] as strings, used by the chunker's hard-window fallback. */
-    fun tokenize(text: String): List<String> = counter.encode(text).tokens.toList()
-
     fun encode(texts: List<String>): TokenizedBatch {
         require(texts.isNotEmpty()) { "Cannot encode an empty batch" }
         val encodings = encoder.batchEncode(texts)
         val width = encodings.maxOf { it.ids.size }
-
         // Padding is applied here rather than delegated to the tokenizer so that the batch shape is
         // decided by this code and visible in tests, instead of depending on tokenizer defaults.
         fun pad(rows: List<LongArray>): Array<LongArray> =
@@ -78,9 +72,7 @@ class WordPieceTokenizer(
         encoder.close()
         counter.close()
     }
-
-    private companion object {
-        /** [CLS] and [SEP]. */
-        const val SPECIAL_TOKENS = 2
-    }
 }
+
+/** [CLS] and [SEP]. */
+private const val SPECIAL_TOKENS = 2

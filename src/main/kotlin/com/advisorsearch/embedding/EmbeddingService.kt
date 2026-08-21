@@ -1,8 +1,14 @@
 package com.advisorsearch.embedding
 
 import com.advisorsearch.config.EmbeddingProperties
+import com.advisorsearch.support.WHITESPACE_RUN
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+
+private val log = LoggerFactory.getLogger(EmbeddingService::class.java)
+
+/** Leaves the encoder window comfortably clear for a full-size chunk plus [CLS]/[SEP]. */
+private const val TITLE_TOKEN_BUDGET = 20
 
 /**
  * The one embedding path used by both indexing and querying. Sharing it is what makes the two
@@ -39,7 +45,7 @@ class EmbeddingService(
     }
 
     private fun titlePrefix(title: String): String {
-        val condensed = title.trim().replace(WHITESPACE, " ")
+        val condensed = title.trim().replace(WHITESPACE_RUN, " ")
         if (condensed.isEmpty()) return ""
         return "Title: " + truncateToTokens(condensed, TITLE_TOKEN_BUDGET) + "\n\n"
     }
@@ -62,18 +68,10 @@ class EmbeddingService(
         log.info(
             "Embedding model {} ready: {} dimensions, {}-token window, {}-token chunks with {} overlap",
             properties.modelId,
-            embedder.dimensions,
+            EMBEDDING_DIMENSIONS,
             properties.maxTokens,
             properties.chunkTokens,
             properties.chunkOverlapTokens,
         )
-    }
-
-    private companion object {
-        val log = LoggerFactory.getLogger(EmbeddingService::class.java)
-        val WHITESPACE = Regex("\\s+")
-
-        /** Leaves the encoder window comfortably clear for a full-size chunk plus [CLS]/[SEP]. */
-        const val TITLE_TOKEN_BUDGET = 20
     }
 }

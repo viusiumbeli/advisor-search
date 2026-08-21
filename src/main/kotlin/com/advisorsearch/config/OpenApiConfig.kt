@@ -8,6 +8,8 @@ import io.swagger.v3.oas.models.security.SecurityScheme
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
+private const val API_KEY = "ApiKey"
+
 @Configuration
 class OpenApiConfig {
     @Bean
@@ -34,7 +36,4 @@ class OpenApiConfig {
                 ),
             ).addSecurityItem(SecurityRequirement().addList(API_KEY))
 
-    private companion object {
-        const val API_KEY = "ApiKey"
-    }
 }

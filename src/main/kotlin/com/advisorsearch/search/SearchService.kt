@@ -3,9 +3,19 @@ package com.advisorsearch.search
 import com.advisorsearch.config.SearchProperties
 import com.advisorsearch.embedding.EmbeddingService
 import com.advisorsearch.support.InvalidRequestException
+import com.advisorsearch.support.WHITESPACE_RUN
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import java.util.UUID
+import kotlin.time.TimeSource
+
+private val log = LoggerFactory.getLogger(SearchService::class.java)
+
+private const val SNIPPET_LENGTH = 240
+private const val KEYWORD = "keyword"
+private const val SEMANTIC = "semantic"
+
+/** Most to least corroborated, used only to break exact fusion ties. */
+private val EVIDENCE_ORDER = listOf("both", KEYWORD, SEMANTIC)
 
 @Service
 class SearchService(
@@ -22,7 +32,7 @@ class SearchService(
         val query = rawQuery.trim()
         if (query.isEmpty()) throw InvalidRequestException("q must contain at least one non-blank character")
         val limit = (requestedLimit ?: properties.defaultLimit).coerceIn(1, properties.maxLimit)
-        val startedAt = System.nanoTime()
+        val started = TimeSource.Monotonic.markNow()
 
         val clientHits = findClients(query, limit)
         val keyword = findLexically(query)
@@ -30,13 +40,13 @@ class SearchService(
         val documentHits = fuse(keyword, semantic, limit)
 
         log.info(
-            "search q='{}' clients={} keyword={} semantic={} returned={} in {}ms",
+            "search q='{}' clients={} keyword={} semantic={} returned={} in {}",
             query,
             clientHits.size,
             keyword.size,
             semantic.size,
             documentHits.size,
-            (System.nanoTime() - startedAt) / 1_000_000,
+            started.elapsedNow(),
         )
         return clientHits + documentHits
     }
@@ -78,14 +88,12 @@ class SearchService(
      */
     private fun findSemantically(query: String): List<DocumentMatch> {
         val probes = expander.expand(query)
-        val best = LinkedHashMap<UUID, DocumentMatch>()
-        for (probe in probes) {
-            val vector = embeddings.embedQuery(probe)
-            for (match in documents.semanticSearch(vector, properties.candidateChunks)) {
-                val incumbent = best[match.reference.id]
-                if (incumbent == null || match.score > incumbent.score) best[match.reference.id] = match
-            }
-        }
+        val best =
+            probes
+                .flatMap { probe ->
+                    documents.semanticSearch(embeddings.embedQuery(probe), properties.candidateChunks)
+                }.bestByDocument()
+
         // Both floors are applied here, while the numbers are still cosine similarities. After
         // fusion there are only ranks, and "not similar enough" cannot be expressed as a rank.
         //
@@ -93,11 +101,9 @@ class SearchService(
         // one decides how many results are worth showing: cosine has no calibrated scale across
         // queries, but within one query the scores are comparable, so a document scoring well below
         // this query's best match is a loosely-related document rather than an answer.
-        val ceiling = best.values.maxOfOrNull { it.score } ?: 0.0
+        val ceiling = best.firstOrNull()?.score ?: 0.0
         val floor = maxOf(properties.semanticFloor, ceiling * properties.semanticFloorRatio)
-        return best.values
-            .filter { it.score >= floor }
-            .sortedWith(compareByDescending<DocumentMatch> { it.score }.thenBy { it.reference.id })
+        return best.filter { it.score >= floor }
     }
 
     private fun fuse(
@@ -115,47 +121,39 @@ class SearchService(
                 properties.rrfK,
             )
 
-        // A keyword hit carries a ts_headline built around the query terms, which reads better than
-        // a whole chunk; a semantic-only hit falls back to its best-matching passage.
+        // Exact ties are common: two documents that placed equally in different lists score
+        // identically. They are broken by evidence first — a lexical hit is a fact, the token is in
+        // the document, while a semantic hit is an estimate — and then by title. Neither falls back
+        // to the primary key, because ids are random per install and would reorder results between
+        // one deployment and the next. Sorting happens on the full-precision score; rounding is
+        // presentation and would otherwise manufacture additional ties.
         val headlines = keyword.associate { it.reference.id to it.snippet }
         return fused
             .map { item ->
                 val match = byId.getValue(item.id)
+                Triple(item, match, if (item.sources.size > 1) "both" else item.sources.first())
+            }.sortedWith(
+                compareByDescending<Triple<ReciprocalRankFusion.Fused, DocumentMatch, String>> { it.first.score }
+                    .thenBy { EVIDENCE_ORDER.indexOf(it.third) }
+                    .thenBy { it.second.reference.title }
+                    .thenBy { it.second.reference.id },
+            ).take(limit)
+            .map { (item, match, matchedOn) ->
                 DocumentHit(
                     score = item.score.asScore(),
-                    matchedOn = if (item.sources.size > 1) "both" else item.sources.first(),
+                    matchedOn = matchedOn,
+                    // A keyword hit carries a ts_headline built around the query terms, which reads
+                    // better than a whole chunk; a semantic-only hit falls back to its best passage.
                     snippet = headlines[item.id]?.takeIf { it.isNotBlank() } ?: abbreviate(match.snippet),
                     document = match.reference,
                 )
             }
-            // Exact ties are common: two documents that placed equally in different lists score
-            // identically. They are broken by evidence first — a lexical hit is a fact, the token is
-            // in the document, while a semantic hit is an estimate — and then by title. Neither
-            // falls back to the primary key, because ids are random per install and would reorder
-            // results between one deployment and the next.
-            .sortedWith(
-                compareByDescending<DocumentHit> { it.score }
-                    .thenBy { EVIDENCE_ORDER.indexOf(it.matchedOn) }
-                    .thenBy { it.document.title }
-                    .thenBy { it.document.id },
-            ).take(limit)
     }
 
     private fun abbreviate(text: String): String {
-        val collapsed = text.replace(WHITESPACE, " ").trim()
+        val collapsed = text.replace(WHITESPACE_RUN, " ").trim()
         if (collapsed.length <= SNIPPET_LENGTH) return collapsed
         val cut = collapsed.lastIndexOf(' ', SNIPPET_LENGTH).takeIf { it > SNIPPET_LENGTH / 2 } ?: SNIPPET_LENGTH
         return collapsed.take(cut).trimEnd(',', '.', ';') + "…"
-    }
-
-    private companion object {
-        val log = LoggerFactory.getLogger(SearchService::class.java)
-        val WHITESPACE = Regex("\\s+")
-        const val SNIPPET_LENGTH = 240
-        const val KEYWORD = "keyword"
-        const val SEMANTIC = "semantic"
-
-        /** Most to least corroborated, used only to break exact fusion ties. */
-        val EVIDENCE_ORDER = listOf("both", KEYWORD, SEMANTIC)
     }
 }

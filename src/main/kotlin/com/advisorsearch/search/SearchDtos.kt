@@ -2,7 +2,6 @@ package com.advisorsearch.search
 
 import com.advisorsearch.clients.Client
 import com.fasterxml.jackson.annotation.JsonPropertyOrder
-import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -12,7 +11,7 @@ import java.util.UUID
  * reciprocal rank fusion weight of 0.016393442622950820 says nothing more than 0.0164 does — and
  * they make a response hard to read.
  */
-internal fun Double.asScore(): Double = BigDecimal(this).setScale(4, RoundingMode.HALF_UP).toDouble()
+internal fun Double.asScore(): Double = toBigDecimal().setScale(4, RoundingMode.HALF_UP).toDouble()
 
 /**
  * One flat array, as the task's OpenAPI fragment specifies, but ordered in two blocks: every client

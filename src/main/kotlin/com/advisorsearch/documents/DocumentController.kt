@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.util.UriComponentsBuilder
+import java.net.URI
 import java.util.UUID
 
 @RestController
@@ -31,8 +31,7 @@ class DocumentController(
         val document = service.create(clientId, request)
         // Documents carry globally unique ids, so their canonical location is /documents/{id};
         // the client path is where a document is created, not where it lives.
-        val location = UriComponentsBuilder.fromPath("/documents/{id}").build(document.id)
-        return ResponseEntity.created(location).body(document)
+        return ResponseEntity.created(URI.create("/documents/${document.id}")).body(document)
     }
 
     @GetMapping("/documents/{id}")

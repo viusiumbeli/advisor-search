@@ -6,9 +6,11 @@ import ai.onnxruntime.OrtSession
 import com.advisorsearch.embedding.Chunker
 import com.advisorsearch.embedding.WordPieceTokenizer
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty
 import java.io.File
 import java.nio.LongBuffer
 import java.nio.file.Path
+import kotlin.io.path.listDirectoryEntries
 import kotlin.math.sqrt
 
 /**
@@ -58,9 +60,11 @@ class ModelSelectionExperiment {
         )
 
     @Test
+    @EnabledIfSystemProperty(named = "candidates", matches = ".+")
     fun `compare candidate models on the probe queries`() {
-        val root = System.getProperty("candidates")?.takeIf { it.isNotBlank() } ?: return println("skipped: -Dcandidates not set")
-        val documents = File("src/main/resources/seed/documents").listFiles { f -> f.extension == "txt" }!!.sortedBy { it.name }
+        val root = System.getProperty("candidates")
+        val documents =
+            Path.of("src/main/resources/seed/documents").listDirectoryEntries("*.txt").map(java.nio.file.Path::toFile).sortedBy { it.name }
 
         candidates.forEach { candidate ->
             val dir = File(root, if (candidate.dir == "baseline") "" else candidate.dir)
@@ -188,5 +192,4 @@ class ModelSelectionExperiment {
         return dot
     }
 
-    private operator fun <T> List<T>.component3(): T = this[2]
 }

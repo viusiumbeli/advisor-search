@@ -1,9 +1,9 @@
 package com.advisorsearch.search
 
 import com.advisorsearch.support.toVectorLiteral
+import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
-import java.sql.ResultSet
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -12,6 +12,33 @@ data class DocumentMatch(
     val score: Double,
     val snippet: String,
 )
+
+/**
+ * Best match per document across several ranked lists (one per query probe), highest score first.
+ * Shared by the search service and the calibration test so the test exercises the same reduction
+ * production uses instead of re-implementing it.
+ */
+internal fun Iterable<DocumentMatch>.bestByDocument(): List<DocumentMatch> =
+    groupingBy { it.reference.id }
+        .reduce { _, best, candidate -> maxOf(best, candidate, compareBy(DocumentMatch::score)) }
+        .values
+        .sortedWith(compareByDescending<DocumentMatch> { it.score }.thenBy { it.reference.id })
+
+/** Hand-mapped because the row feeds a nested reference plus score and snippet. */
+private val documentMatchRowMapper =
+    RowMapper { row, _ ->
+        DocumentMatch(
+            reference =
+                DocumentReference(
+                    id = row.getObject("id", UUID::class.java),
+                    clientId = row.getObject("client_id", UUID::class.java),
+                    title = row.getString("title"),
+                    createdAt = row.getObject("created_at", OffsetDateTime::class.java),
+                ),
+            score = row.getDouble("score"),
+            snippet = row.getString("snippet"),
+        )
+    }
 
 @Repository
 class DocumentSearchRepository(
@@ -44,7 +71,7 @@ class DocumentSearchRepository(
                 """.trimIndent(),
             ).param("query", query)
             .param("limit", limit)
-            .query(::mapMatch)
+            .query(documentMatchRowMapper)
             .list()
 
     /**
@@ -77,25 +104,10 @@ class DocumentSearchRepository(
                 """.trimIndent(),
             ).param("vector", queryVector.toVectorLiteral())
             .param("candidates", candidateChunks)
-            .query(::mapMatch)
+            .query(documentMatchRowMapper)
             .list()
             // DISTINCT ON has to lead with the grouping column, so the rows come back ordered by
             // document id. Relevance order is restored here.
             .sortedWith(compareByDescending<DocumentMatch> { it.score }.thenBy { it.reference.id })
 
-    private fun mapMatch(
-        row: ResultSet,
-        @Suppress("UNUSED_PARAMETER") rowNumber: Int,
-    ): DocumentMatch =
-        DocumentMatch(
-            reference =
-                DocumentReference(
-                    id = row.getObject("id", UUID::class.java),
-                    clientId = row.getObject("client_id", UUID::class.java),
-                    title = row.getString("title"),
-                    createdAt = row.getObject("created_at", OffsetDateTime::class.java),
-                ),
-            score = row.getDouble("score"),
-            snippet = row.getString("snippet"),
-        )
 }

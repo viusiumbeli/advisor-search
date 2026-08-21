@@ -5,16 +5,16 @@ import com.advisorsearch.embedding.OnnxEmbedder
 import com.advisorsearch.embedding.WordPieceTokenizer
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.io.path.isRegularFile
 
 @Configuration
 class EmbeddingConfig {
-    @Bean(destroyMethod = "close")
+    @Bean
     fun tokenizer(properties: EmbeddingProperties): WordPieceTokenizer =
         WordPieceTokenizer(existing(properties.tokenizerPath), properties.maxTokens)
 
-    @Bean(destroyMethod = "close")
+    @Bean
     fun embedder(
         properties: EmbeddingProperties,
         tokenizer: WordPieceTokenizer,
@@ -32,7 +32,7 @@ class EmbeddingConfig {
      */
     private fun existing(path: String): Path {
         val resolved = Path.of(path).toAbsolutePath()
-        check(Files.isRegularFile(resolved)) {
+        check(resolved.isRegularFile()) {
             "Embedding artefact not found at $resolved. Run ./gradlew provisionModel, or set " +
                 "EMBEDDING_MODEL_PATH and EMBEDDING_TOKENIZER_PATH to where the files live."
         }

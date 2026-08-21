@@ -1,11 +1,48 @@
 package com.advisorsearch.search
 
 import com.advisorsearch.clients.Client
-import com.advisorsearch.clients.ClientRepository
+import com.advisorsearch.clients.toClient
 import com.advisorsearch.support.escapeLikeWildcards
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
+
+/**
+ * Builds the one client search statement from its two variable parts. Only compile-time constants
+ * are ever interpolated here; user input reaches the statement exclusively through the named
+ * parameters.
+ *
+ * `matched_on` names a field only when the query literally occurs in it. A fuzzy hit has no single
+ * responsible field — the similarity is computed over the whole profile — so it reports `profile`
+ * rather than inventing an attribution.
+ */
+private fun clientSearchSql(
+    score: String,
+    predicate: String,
+) = """
+    SELECT id, first_name, last_name, email, description, social_links,
+           $score AS score,
+           CASE
+               WHEN lower(first_name || ' ' || last_name) LIKE :pattern ESCAPE '\' THEN 'name'
+               WHEN lower(email) LIKE :pattern ESCAPE '\' THEN 'email'
+               WHEN lower(coalesce(description, '')) LIKE :pattern ESCAPE '\' THEN 'description'
+               ELSE 'profile'
+           END AS matched_on
+    FROM clients
+    WHERE $predicate
+    ORDER BY score DESC, last_name, first_name, id
+    LIMIT :limit
+    """.trimIndent()
+
+private const val SUBSTRING_SCORE = "CASE WHEN search_text LIKE :pattern ESCAPE '\\' THEN 1.0 ELSE 0.0 END"
+
+private val SUBSTRING_ONLY = clientSearchSql(SUBSTRING_SCORE, "search_text LIKE :pattern ESCAPE '\\'")
+
+private val SUBSTRING_AND_FUZZY =
+    clientSearchSql(
+        "GREATEST($SUBSTRING_SCORE, word_similarity(:query, search_text))",
+        "search_text LIKE :pattern ESCAPE '\\' OR :query <% search_text",
+    )
 
 data class ClientMatch(
     val client: Client,
@@ -17,9 +54,9 @@ data class ClientMatch(
  * Clients are found with trigrams, not full-text search.
  *
  * Postgres tokenises `jane.roe@aldgatewealth.example` into a single `email` lexeme, so a full-text
- * query for "AldgateWealth" can never match inside it — the task's own example would fail. Trigrams index
- * three-character shingles of the whole profile, so a substring of an email, a misspelled surname
- * and a word from a description are all reachable through one index.
+ * query for "AldgateWealth" can never match inside it — the task's own example would fail. Trigrams
+ * index three-character shingles of the whole profile, so a substring of an email, a misspelled
+ * surname and a word from a description are all reachable through one index.
  */
 @Repository
 class ClientSearchRepository(
@@ -46,52 +83,17 @@ class ClientSearchRepository(
                 .single()
         }
 
-        val sql = if (fuzzy) SUBSTRING_AND_FUZZY else SUBSTRING_ONLY
         return jdbc
-            .sql(sql)
+            .sql(if (fuzzy) SUBSTRING_AND_FUZZY else SUBSTRING_ONLY)
             .param("pattern", "%" + query.escapeLikeWildcards() + "%")
             .param("query", query)
             .param("limit", limit)
-            .query { row, rowNumber ->
+            .query { row, _ ->
                 ClientMatch(
-                    client = ClientRepository.mapClient(row, rowNumber),
+                    client = row.toClient(),
                     score = row.getDouble("score"),
                     matchedOn = row.getString("matched_on"),
                 )
             }.list()
-    }
-
-    private companion object {
-        /**
-         * `matched_on` names a field only when the query literally occurs in it. A fuzzy hit has no
-         * single responsible field — the similarity is computed over the whole profile — so it
-         * reports `profile` rather than inventing an attribution.
-         */
-        val PROJECTION =
-            """
-            SELECT id, first_name, last_name, email, description, social_links,
-                   %s AS score,
-                   CASE
-                       WHEN lower(first_name || ' ' || last_name) LIKE :pattern ESCAPE '\' THEN 'name'
-                       WHEN lower(email) LIKE :pattern ESCAPE '\' THEN 'email'
-                       WHEN lower(coalesce(description, '')) LIKE :pattern ESCAPE '\' THEN 'description'
-                       ELSE 'profile'
-                   END AS matched_on
-            FROM clients
-            WHERE %s
-            ORDER BY score DESC, last_name, first_name, id
-            LIMIT :limit
-            """.trimIndent()
-
-        val SUBSTRING_SCORE = "CASE WHEN search_text LIKE :pattern ESCAPE '\\' THEN 1.0 ELSE 0.0 END"
-
-        val SUBSTRING_ONLY =
-            PROJECTION.format(SUBSTRING_SCORE, "search_text LIKE :pattern ESCAPE '\\'")
-
-        val SUBSTRING_AND_FUZZY =
-            PROJECTION.format(
-                "GREATEST($SUBSTRING_SCORE, word_similarity(:query, search_text))",
-                "search_text LIKE :pattern ESCAPE '\\' OR :query <% search_text",
-            )
     }
 }

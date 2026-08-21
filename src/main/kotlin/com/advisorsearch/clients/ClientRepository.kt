@@ -1,9 +1,34 @@
 package com.advisorsearch.clients
 
+import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
 import java.util.UUID
+import kotlin.jvm.optionals.getOrNull
+
+/**
+ * Maps a client row. Hand-written on purpose: `social_links` is a Postgres `text[]`, which no
+ * property-based row mapper converts. Shared with the search repository, which selects the same
+ * columns plus its own score.
+ */
+internal fun ResultSet.toClient(): Client =
+    Client(
+        id = getObject("id", UUID::class.java),
+        firstName = getString("first_name"),
+        lastName = getString("last_name"),
+        email = getString("email"),
+        description = getString("description"),
+        socialLinks = socialLinks(),
+    )
+
+internal val clientRowMapper = RowMapper { row, _ -> row.toClient() }
+
+private fun ResultSet.socialLinks(): List<String> {
+    val array = getArray("social_links") ?: return emptyList()
+    @Suppress("UNCHECKED_CAST")
+    return (array.array as Array<String?>).filterNotNull()
+}
 
 @Repository
 class ClientRepository(
@@ -22,7 +47,7 @@ class ClientRepository(
             .param("email", request.email!!.trim())
             .param("description", request.description?.trim()?.ifEmpty { null })
             .param("socialLinks", request.socialLinks.toTypedArray())
-            .query(::mapClient)
+            .query(clientRowMapper)
             .single()
 
     fun findById(id: UUID): Client? =
@@ -33,9 +58,9 @@ class ClientRepository(
                 FROM clients WHERE id = :id
                 """.trimIndent(),
             ).param("id", id)
-            .query(::mapClient)
+            .query(clientRowMapper)
             .optional()
-            .orElse(null)
+            .getOrNull()
 
     fun findByEmail(email: String): Client? =
         jdbc
@@ -45,36 +70,14 @@ class ClientRepository(
                 FROM clients WHERE lower(email) = lower(:email)
                 """.trimIndent(),
             ).param("email", email)
-            .query(::mapClient)
+            .query(clientRowMapper)
             .optional()
-            .orElse(null)
+            .getOrNull()
 
     fun exists(id: UUID): Boolean =
         jdbc
-            .sql("SELECT 1 FROM clients WHERE id = :id")
+            .sql("SELECT EXISTS(SELECT 1 FROM clients WHERE id = :id)")
             .param("id", id)
-            .query(Int::class.java)
-            .optional()
-            .isPresent
-
-    companion object {
-        fun mapClient(
-            row: ResultSet,
-            @Suppress("UNUSED_PARAMETER") rowNumber: Int,
-        ): Client =
-            Client(
-                id = row.getObject("id", UUID::class.java),
-                firstName = row.getString("first_name"),
-                lastName = row.getString("last_name"),
-                email = row.getString("email"),
-                description = row.getString("description"),
-                socialLinks = socialLinks(row),
-            )
-
-        private fun socialLinks(row: ResultSet): List<String> {
-            val array = row.getArray("social_links") ?: return emptyList()
-            @Suppress("UNCHECKED_CAST")
-            return (array.array as Array<String?>).filterNotNull()
-        }
-    }
+            .query(Boolean::class.java)
+            .single()
 }

@@ -5,12 +5,12 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/advisor_search}
     username: ${DB_USERNAME:advisor}
     password: ${DB_PASSWORD:advisor}
-  flyway:
-    enabled: true
   jackson:
     # The task's OpenAPI fragment uses first_name / client_id / created_at, so the whole API speaks
     # snake_case rather than annotating every field.
     property-naming-strategy: SNAKE_CASE
+    # An API decision, not a serializer detail: an absent optional field (a client with no
+    # description) is omitted from the JSON rather than sent as an explicit null.
     default-property-inclusion: non_null
   mvc:
     problemdetails:

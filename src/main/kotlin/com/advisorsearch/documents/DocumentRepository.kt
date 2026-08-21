@@ -7,9 +7,8 @@ import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
 import java.sql.PreparedStatement
-import java.sql.ResultSet
-import java.time.OffsetDateTime
 import java.util.UUID
+import kotlin.jvm.optionals.getOrNull
 
 @Repository
 class DocumentRepository(
@@ -43,7 +42,7 @@ class DocumentRepository(
                 ).param("clientId", clientId)
                 .param("title", title)
                 .param("content", content)
-                .query(::mapDocument)
+                .query(Document::class.java)
                 .single()
 
         jdbcTemplate.batchUpdate(
@@ -77,9 +76,9 @@ class DocumentRepository(
                 FROM documents WHERE id = :id
                 """.trimIndent(),
             ).param("id", id)
-            .query(::mapDocument)
+            .query(Document::class.java)
             .optional()
-            .orElse(null)
+            .getOrNull()
 
     /**
      * Picks the passages closest to the document's own centroid.
@@ -97,7 +96,7 @@ class DocumentRepository(
                 WITH centroid AS (
                     SELECT avg(embedding) AS vector FROM document_chunks WHERE document_id = :id
                 )
-                SELECT chunk_index, content,
+                SELECT chunk_index, content AS text,
                        1 - (embedding <=> (SELECT vector FROM centroid)) AS centrality
                 FROM document_chunks
                 WHERE document_id = :id
@@ -106,31 +105,26 @@ class DocumentRepository(
                 """.trimIndent(),
             ).param("id", documentId)
             .param("count", count)
-            .query { row, _ ->
-                DocumentSummary.Passage(
-                    chunkIndex = row.getInt("chunk_index"),
-                    text = row.getString("content"),
-                    centrality = row.getDouble("centrality"),
-                )
-            }.list()
-
-    fun existsForClientWithTitle(
-        clientId: UUID,
-        title: String,
-    ): Boolean =
-        jdbc
-            .sql("SELECT 1 FROM documents WHERE client_id = :clientId AND title = :title")
-            .param("clientId", clientId)
-            .param("title", title)
-            .query(Int::class.java)
-            .optional()
-            .isPresent
+            .query(DocumentSummary.Passage::class.java)
+            .list()
+            .filterNotNull()
 
     fun countChunks(documentId: UUID): Int =
         jdbc
             .sql("SELECT count(*) FROM document_chunks WHERE document_id = :id")
             .param("id", documentId)
             .query(Int::class.java)
+            .single()
+
+    fun existsForClientWithTitle(
+        clientId: UUID,
+        title: String,
+    ): Boolean =
+        jdbc
+            .sql("SELECT EXISTS(SELECT 1 FROM documents WHERE client_id = :clientId AND title = :title)")
+            .param("clientId", clientId)
+            .param("title", title)
+            .query(Boolean::class.java)
             .single()
 
     /** Model ids present in the corpus, used by the startup consistency check. */
@@ -140,18 +134,4 @@ class DocumentRepository(
             .query(String::class.java)
             .list()
             .filterNotNull()
-
-    companion object {
-        fun mapDocument(
-            row: ResultSet,
-            @Suppress("UNUSED_PARAMETER") rowNumber: Int,
-        ): Document =
-            Document(
-                id = row.getObject("id", UUID::class.java),
-                clientId = row.getObject("client_id", UUID::class.java),
-                title = row.getString("title"),
-                content = row.getString("content"),
-                createdAt = row.getObject("created_at", OffsetDateTime::class.java),
-            )
-    }
 }

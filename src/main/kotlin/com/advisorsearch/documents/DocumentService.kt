@@ -8,6 +8,10 @@ import com.advisorsearch.support.ResourceNotFoundException
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.util.UUID
+import kotlin.time.measureTimedValue
+
+private val log = LoggerFactory.getLogger(DocumentService::class.java)
+private const val SUMMARY_PASSAGES = 3
 
 @Service
 class DocumentService(
@@ -38,20 +42,18 @@ class DocumentService(
             )
         }
 
-        val startedAt = System.nanoTime()
         val chunks = embeddings.chunk(content)
-        val vectors = embeddings.embedChunks(title, chunks)
-        val embedMillis = (System.nanoTime() - startedAt) / 1_000_000
+        val (vectors, embedTime) = measureTimedValue { embeddings.embedChunks(title, chunks) }
 
         val document =
             documents.insertWithChunks(clientId, title, content, chunks, vectors, embeddings.modelId)
         log.info(
-            "Ingested document {} for client {}: {} characters, {} chunks, embedded in {} ms",
+            "Ingested document {} for client {}: {} characters, {} chunks, embedded in {}",
             document.id,
             clientId,
             content.length,
             chunks.size,
-            embedMillis,
+            embedTime,
         )
         return document
     }
@@ -73,8 +75,4 @@ class DocumentService(
         )
     }
 
-    private companion object {
-        val log = LoggerFactory.getLogger(DocumentService::class.java)
-        const val SUMMARY_PASSAGES = 3
-    }
 }

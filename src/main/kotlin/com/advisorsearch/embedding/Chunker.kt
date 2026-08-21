@@ -1,5 +1,14 @@
 package com.advisorsearch.embedding
 
+private val PARAGRAPH_BREAK = Regex("\\R[ \\t]*\\R")
+private val SENTENCE_BREAK = Regex("(?<=[.!?])\\s+")
+
+/** Only a starting guess for the hard split; the tokenizer has the final say. */
+private const val ESTIMATED_CHARS_PER_TOKEN = 4
+
+/** No natural-language text reaches this density, so it only bites on degenerate input. */
+private const val MAX_CHARS_PER_TOKEN = 12
+
 /**
  * Splits document text into overlapping pieces that fit the encoder's window.
  *
@@ -173,16 +182,5 @@ class Chunker(
         if (end >= text.length) return text
         val space = text.lastIndexOf(' ', end)
         return if (space > end / 2) text.substring(0, space) else text.substring(0, end)
-    }
-
-    private companion object {
-        val PARAGRAPH_BREAK = Regex("\\R[ \\t]*\\R")
-        val SENTENCE_BREAK = Regex("(?<=[.!?])\\s+")
-
-        /** Only a starting guess for the hard split; the tokenizer has the final say. */
-        const val ESTIMATED_CHARS_PER_TOKEN = 4
-
-        /** No natural-language text reaches this density, so it only bites on degenerate input. */
-        const val MAX_CHARS_PER_TOKEN = 12
     }
 }

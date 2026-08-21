@@ -1,9 +1,16 @@
 package com.advisorsearch.search
 
+import com.advisorsearch.support.WHITESPACE_RUN
 import org.slf4j.LoggerFactory
 import org.springframework.core.io.ClassPathResource
 import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
+
+private val log = LoggerFactory.getLogger(QueryExpander::class.java)
+private const val LEXICON = "search/query-expansions.json"
+
+/** Each probe is an extra embedding and an extra scan; the ceiling keeps that bounded. */
+private const val MAX_PROBES = 5
 
 /**
  * Supplies the one thing a general-purpose embedding model does not know: which documents serve
@@ -59,20 +66,5 @@ class QueryExpander(
         return probes
     }
 
-    /** The concepts a query matched, for explaining a result rather than for retrieval. */
-    fun conceptsFor(query: String): List<String> {
-        val normalised = normalise(query)
-        return rules.filter { rule -> rule.triggers.any(normalised::contains) }.map { it.concept }
-    }
-
-    private fun normalise(text: String): String = text.lowercase().replace(WHITESPACE, " ").trim()
-
-    private companion object {
-        val log = LoggerFactory.getLogger(QueryExpander::class.java)
-        val WHITESPACE = Regex("\\s+")
-        const val LEXICON = "search/query-expansions.json"
-
-        /** Each probe is an extra embedding and an extra scan; the ceiling keeps that bounded. */
-        const val MAX_PROBES = 5
-    }
+    private fun normalise(text: String): String = text.lowercase().replace(WHITESPACE_RUN, " ").trim()
 }

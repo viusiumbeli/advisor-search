@@ -7,6 +7,9 @@ import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
 import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
+import kotlin.time.measureTimedValue
+
+private val log = LoggerFactory.getLogger(StartupChecks::class.java)
 
 /**
  * Two things are verified before the instance is allowed to report itself ready.
@@ -42,13 +45,8 @@ class StartupChecks(
      * fails startup rather than the first search.
      */
     private fun warmUp() {
-        val startedAt = System.nanoTime()
-        val vector = embeddings.embedQuery("warm up the embedding model")
+        val (vector, elapsed) = measureTimedValue { embeddings.embedQuery("warm up the embedding model") }
         check(vector.isNotEmpty()) { "Embedding model returned an empty vector" }
-        log.info("Embedding warmup completed in {} ms", (System.nanoTime() - startedAt) / 1_000_000)
-    }
-
-    private companion object {
-        val log = LoggerFactory.getLogger(StartupChecks::class.java)
+        log.info("Embedding warmup completed in {}", elapsed)
     }
 }

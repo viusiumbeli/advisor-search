@@ -9,6 +9,13 @@ import org.slf4j.LoggerFactory
 import org.springframework.core.io.ClassPathResource
 import org.springframework.stereotype.Service
 import tools.jackson.databind.ObjectMapper
+import tools.jackson.module.kotlin.readValue
+import java.nio.charset.StandardCharsets.UTF_8
+import kotlin.time.TimeSource
+
+private val log = LoggerFactory.getLogger(SeedService::class.java)
+private const val CORPUS = "seed/corpus.json"
+private const val DOCUMENTS = "seed/documents"
 
 /**
  * Loads the demo corpus so that a freshly started instance has something to search.
@@ -45,39 +52,39 @@ class SeedService(
         val file: String,
     )
 
-    data class Result(
+    data class SeedSummary(
         val clientsCreated: Int,
         val documentsCreated: Int,
         val skipped: Int,
     )
 
-    fun seed(): Result {
-        val corpus = objectMapper.readValue(ClassPathResource(CORPUS).inputStream, Corpus::class.java)
+    fun seed(): SeedSummary {
+        val corpus: Corpus = objectMapper.readValue(ClassPathResource(CORPUS).inputStream)
+        val started = TimeSource.Monotonic.markNow()
         var clientsCreated = 0
         var documentsCreated = 0
         var skipped = 0
-        val startedAt = System.nanoTime()
 
         for (seedClient in corpus.clients) {
-            val existing = clients.findByEmail(seedClient.email)
             val client =
-                existing ?: clients
-                    .insert(
-                        CreateClientRequest(
-                            firstName = seedClient.firstName,
-                            lastName = seedClient.lastName,
-                            email = seedClient.email,
-                            description = seedClient.description,
-                            socialLinks = seedClient.socialLinks,
-                        ),
-                    ).also { clientsCreated++ }
+                clients.findByEmail(seedClient.email)
+                    ?: clients
+                        .insert(
+                            CreateClientRequest(
+                                firstName = seedClient.firstName,
+                                lastName = seedClient.lastName,
+                                email = seedClient.email,
+                                description = seedClient.description,
+                                socialLinks = seedClient.socialLinks,
+                            ),
+                        ).also { clientsCreated++ }
 
             for (seedDocument in seedClient.documents) {
                 if (documents.existsForClientWithTitle(client.id, seedDocument.title)) {
                     skipped++
                     continue
                 }
-                val content = ClassPathResource("$DOCUMENTS/${seedDocument.file}").inputStream.reader().readText()
+                val content = ClassPathResource("$DOCUMENTS/${seedDocument.file}").getContentAsString(UTF_8)
                 documentService.create(
                     client.id,
                     CreateDocumentRequest(title = seedDocument.title, content = content),
@@ -86,20 +93,13 @@ class SeedService(
             }
         }
 
-        val elapsed = (System.nanoTime() - startedAt) / 1_000_000
         log.info(
-            "Seed complete in {} ms: {} clients and {} documents created, {} documents already present",
-            elapsed,
+            "Seed complete in {}: {} clients and {} documents created, {} documents already present",
+            started.elapsedNow(),
             clientsCreated,
             documentsCreated,
             skipped,
         )
-        return Result(clientsCreated, documentsCreated, skipped)
-    }
-
-    private companion object {
-        val log = LoggerFactory.getLogger(SeedService::class.java)
-        const val CORPUS = "seed/corpus.json"
-        const val DOCUMENTS = "seed/documents"
+        return SeedSummary(clientsCreated, documentsCreated, skipped)
     }
 }

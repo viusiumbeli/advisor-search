@@ -8,6 +8,11 @@ import java.nio.LongBuffer
 import java.nio.file.Path
 import kotlin.math.sqrt
 
+private val log = LoggerFactory.getLogger(OnnxEmbedder::class.java)
+
+/** all-MiniLM-L6-v2 hidden size; also the `vector(384)` column width in the schema. */
+const val EMBEDDING_DIMENSIONS = 384
+
 /**
  * all-MiniLM-L6-v2 running in-process on ONNX Runtime.
  *
@@ -23,8 +28,6 @@ class OnnxEmbedder(
 ) : AutoCloseable {
     private val environment: OrtEnvironment = OrtEnvironment.getEnvironment()
     private val session: OrtSession = environment.createSession(modelPath.toString(), OrtSession.SessionOptions())
-
-    val dimensions: Int = DIMENSIONS
 
     init {
         log.info(
@@ -76,7 +79,7 @@ class OnnxEmbedder(
         attentionMask: Array<LongArray>,
     ): List<FloatArray> {
         val (batchSize, sequenceLength, width) = hidden.info.shape.map(Long::toInt)
-        check(width == dimensions) { "Model produced $width dimensions, expected $dimensions" }
+        check(width == EMBEDDING_DIMENSIONS) { "Model produced $width dimensions, expected $EMBEDDING_DIMENSIONS" }
         val values = hidden.floatBuffer
         return (0 until batchSize).map { row ->
             val pooled = FloatArray(width)
@@ -97,32 +100,23 @@ class OnnxEmbedder(
         }
     }
 
+    private fun normalize(vector: FloatArray): FloatArray {
+        var sumOfSquares = 0.0
+        for (value in vector) sumOfSquares += (value * value).toDouble()
+        val length = sqrt(sumOfSquares).toFloat()
+        if (length == 0f) return vector
+        for (index in vector.indices) vector[index] /= length
+        return vector
+    }
+
     override fun close() {
         session.close()
     }
+}
 
-    companion object {
-        private val log = LoggerFactory.getLogger(OnnxEmbedder::class.java)
-
-        /** all-MiniLM-L6-v2 hidden size; also the `vector(384)` column width in the schema. */
-        const val DIMENSIONS = 384
-
-        fun normalize(vector: FloatArray): FloatArray {
-            var sumOfSquares = 0.0
-            for (value in vector) sumOfSquares += (value * value).toDouble()
-            val length = sqrt(sumOfSquares).toFloat()
-            if (length == 0f) return vector
-            for (index in vector.indices) vector[index] /= length
-            return vector
-        }
-
-        private fun flatten(rows: Array<LongArray>): LongArray {
-            val width = rows[0].size
-            val flat = LongArray(rows.size * width)
-            rows.forEachIndexed { index, row -> row.copyInto(flat, index * width) }
-            return flat
-        }
-
-        private operator fun <T> List<T>.component3(): T = this[2]
-    }
+private fun flatten(rows: Array<LongArray>): LongArray {
+    val width = rows[0].size
+    val flat = LongArray(rows.size * width)
+    rows.forEachIndexed { index, row -> row.copyInto(flat, index * width) }
+    return flat
 }
