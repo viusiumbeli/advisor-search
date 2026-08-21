@@ -7,6 +7,19 @@ import tools.jackson.databind.ObjectMapper
 import tools.jackson.module.kotlin.readValue
 import kotlin.test.assertTrue
 
+/** One evaluation case: the query, the single result that must come back, and why it is interesting. */
+data class GoldenQuery(
+    val query: String,
+    val expect: String,
+    val why: String,
+)
+
+/** The parsed `golden-queries.json`: the evaluation cases, split by what they search for. */
+data class GoldenSet(
+    val documents: List<GoldenQuery>,
+    val clients: List<GoldenQuery>,
+)
+
 /**
  * The evaluation harness. Every query in golden-queries.json must return its expected result inside
  * the top five, and the mean reciprocal rank is printed so a change that keeps every query passing

@@ -13,6 +13,21 @@ private const val LEXICON = "search/query-expansions.json"
 private const val MAX_PROBES = 5
 
 /**
+ * One concept from the expansion lexicon: the phrases that mean an advisor is asking for it, and
+ * the phrases worth searching for as well. Loaded from `search/query-expansions.json`.
+ */
+data class ExpansionRule(
+    val concept: String,
+    val triggers: List<String>,
+    val expansions: List<String>,
+)
+
+/** The parsed `search/query-expansions.json` document: the whole lexicon as a list of rules. */
+data class ExpansionLexicon(
+    val rules: List<ExpansionRule> = emptyList(),
+)
+
+/**
  * Supplies the one thing a general-purpose embedding model does not know: which documents serve
  * which purpose in this domain.
  *

@@ -587,9 +587,11 @@ write path; `search/` holds the three retrievers, with `search/ranking/` for rec
 and `search/expansion/` for the domain lexicon; `seed/` loads the demo corpus (`seed/corpus/`)
 through the real service layer.
 
-On file organisation: no type is nested inside another — each gets its own file, grouped into the
-sub-packages above. Closely related *top-level* types do share a file (`SearchDtos.kt` holds the
-`SearchHit` hierarchy, `Properties.kt` the configuration records), which is what the Kotlin
-conventions call for: "placing multiple declarations in the same Kotlin source file is encouraged as
-long as these declarations are closely related to each other semantically, and the file size remains
-reasonable". One-public-class-per-file is a Java rule that Kotlin deliberately did not adopt.
+On file organisation: no type is nested inside another, and closely related top-level types share a
+file — `ReciprocalRankFusion.kt` holds the fusion object with the `RankedList` it consumes and the
+`FusedDocument` it produces, `SearchDtos.kt` the `SearchHit` hierarchy, `Corpus.kt` the three records
+of one JSON document. That is what the Kotlin conventions call for: "placing multiple declarations in
+the same Kotlin source file is encouraged as long as these declarations are closely related to each
+other semantically, and the file size remains reasonable" — the largest such file here is 59 lines.
+One-public-class-per-file is a Java rule (Google Java Style §3.4.1) that Kotlin deliberately did not
+adopt, and neither ktlint nor detekt enforces it.

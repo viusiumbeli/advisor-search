@@ -18,6 +18,13 @@ private val log = LoggerFactory.getLogger(SeedService::class.java)
 private const val CORPUS = "seed/corpus.json"
 private const val DOCUMENTS = "seed/documents"
 
+/** What one seeding pass did — the counts that make the idempotency visible in the logs. */
+data class SeedSummary(
+    val clientsCreated: Int,
+    val documentsCreated: Int,
+    val skipped: Int,
+)
+
 /**
  * Loads the demo corpus so that a freshly started instance has something to search.
  *
