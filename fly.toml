@@ -34,5 +34,5 @@ primary_region = "lhr"
 [[vm]]
   size = "shared-cpu-1x"
   # ONNX Runtime's arenas are native memory on top of the JVM heap. The 256 MB free tier is not
-  # enough; this instance settles at around 760 MB resident.
+  # enough; this instance settles between 760 and 840 MB resident.
   memory = "2gb"

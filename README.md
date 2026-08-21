@@ -360,15 +360,15 @@ clients, 20 documents and 153 chunks.
 | `GET /search`, one probe, warm | 24 ms median |
 | `GET /search`, 5 expansion probes, warm | 66 ms median |
 | Test suite (60 tests, from clean, no build cache) | 16 s |
-| API container resident memory | 764 MiB |
+| API container resident memory | 760 to 840 MiB |
 | Image size | 576 MB |
 
 **Ingest is synchronous.** A `201` means chunked, embedded and committed, so there is no window in
 which a caller can read back a document that search cannot find. Embedding happens *before* the
-transaction opens, so a connection is never held across model inference. At roughly 35 to 55 ms per chunk
-this holds to around 100 chunks per request; the point to move ingest to a background job is when
-p99 for `POST /clients/{id}/documents` passes about 5 s, which on these numbers means documents
-beyond ~100,000 characters or a sustained bulk import.
+transaction opens, so a connection is never held across model inference. At roughly 35 to 55 ms per
+chunk this holds to around 100 chunks per request. The point to move ingest to a background job is
+when p99 for `POST /clients/{id}/documents` passes about 5 s, which on these numbers means documents
+beyond roughly 100,000 characters, or a sustained bulk import.
 
 **There is deliberately no ANN index.** An exact scan cannot miss a neighbour the way an approximate
 one can, and at this size it is not the bottleneck. Measured on this corpus with vectors copied to
@@ -390,9 +390,10 @@ CREATE INDEX ON document_chunks USING hnsw (embedding vector_cosine_ops);
 That trades exactness for speed, which is a decision to make with a recall measurement in hand
 rather than pre-emptively.
 
-**The client query uses its index at scale.** At 12 rows Postgres correctly ignores the trigram
-index and scans the table. On a synthetic 200,001-row copy of the same schema and the same
-predicate, the plan is what the design intends — one GIN index serving both arms:
+**The client query uses its index at scale.** On a table of a dozen rows Postgres correctly ignores
+the trigram index and scans sequentially, so the seeded corpus proves nothing about it. On a
+synthetic 200,001-row copy of the same schema, with the same predicate, the plan is what the design
+intends — one GIN index serving both arms:
 
 ```
  Limit (actual time=0.929..0.930 rows=1 loops=1)
