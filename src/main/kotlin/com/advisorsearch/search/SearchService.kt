@@ -2,7 +2,6 @@ package com.advisorsearch.search
 
 import com.advisorsearch.config.SearchProperties
 import com.advisorsearch.embedding.EmbeddingService
-import com.advisorsearch.support.InvalidRequestException
 import com.advisorsearch.support.WHITESPACE_RUN
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -30,7 +29,6 @@ class SearchService(
         requestedLimit: Int?,
     ): List<SearchHit> {
         val query = rawQuery.trim()
-        if (query.isEmpty()) throw InvalidRequestException("q must contain at least one non-blank character")
         val limit = (requestedLimit ?: properties.defaultLimit).coerceIn(1, properties.maxLimit)
         val started = TimeSource.Monotonic.markNow()
 

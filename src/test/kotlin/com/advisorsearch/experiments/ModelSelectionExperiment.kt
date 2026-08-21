@@ -64,7 +64,11 @@ class ModelSelectionExperiment {
     fun `compare candidate models on the probe queries`() {
         val root = System.getProperty("candidates")
         val documents =
-            Path.of("src/main/resources/seed/documents").listDirectoryEntries("*.txt").map(java.nio.file.Path::toFile).sortedBy { it.name }
+            Path
+                .of("src/main/resources/seed/documents")
+                .listDirectoryEntries("*.txt")
+                .map(java.nio.file.Path::toFile)
+                .sortedBy { it.name }
 
         candidates.forEach { candidate ->
             val dir = File(root, if (candidate.dir == "baseline") "" else candidate.dir)
@@ -191,5 +195,4 @@ class ModelSelectionExperiment {
         for (index in a.indices) dot += (a[index] * b[index]).toDouble()
         return dot
     }
-
 }

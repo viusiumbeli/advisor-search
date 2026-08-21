@@ -14,6 +14,10 @@ data class Document(
     val createdAt: OffsetDateTime,
 )
 
+/**
+ * The wire shape; required fields nullable for the same reason as [com.advisorsearch.clients.CreateClientRequest]:
+ * nullability buys per-field validation messages and is resolved exactly once in [toNewDocument].
+ */
 data class CreateDocumentRequest(
     @field:NotBlank(message = "must not be blank")
     @field:Size(max = 500, message = "must be at most 500 characters")
@@ -21,6 +25,14 @@ data class CreateDocumentRequest(
     @field:NotBlank(message = "must not be blank")
     val content: String?,
 )
+
+/** A validated, normalised document: what the rest of the application works with. */
+data class NewDocument(
+    val title: String,
+    val content: String,
+)
+
+fun CreateDocumentRequest.toNewDocument(): NewDocument = NewDocument(title = title!!.trim(), content = content!!.trim())
 
 /**
  * Extractive summary: the chunks nearest the document's own centroid, returned in reading order.

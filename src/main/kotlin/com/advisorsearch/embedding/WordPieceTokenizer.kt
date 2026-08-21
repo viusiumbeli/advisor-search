@@ -52,6 +52,7 @@ class WordPieceTokenizer(
         require(texts.isNotEmpty()) { "Cannot encode an empty batch" }
         val encodings = encoder.batchEncode(texts)
         val width = encodings.maxOf { it.ids.size }
+
         // Padding is applied here rather than delegated to the tokenizer so that the batch shape is
         // decided by this code and visible in tests, instead of depending on tokenizer defaults.
         fun pad(rows: List<LongArray>): Array<LongArray> =

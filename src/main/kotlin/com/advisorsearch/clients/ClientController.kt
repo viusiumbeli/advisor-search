@@ -1,11 +1,8 @@
 package com.advisorsearch.clients
 
-import com.advisorsearch.support.DuplicateEmailException
-import com.advisorsearch.support.ResourceNotFoundException
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
-import org.springframework.dao.DuplicateKeyException
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -20,7 +17,7 @@ import java.util.UUID
 @RequestMapping("/clients")
 @Tag(name = "Clients")
 class ClientController(
-    private val repository: ClientRepository,
+    private val service: ClientService,
 ) {
     @PostMapping
     @Operation(
@@ -30,12 +27,7 @@ class ClientController(
     fun create(
         @Valid @RequestBody request: CreateClientRequest,
     ): ResponseEntity<Client> {
-        val client =
-            try {
-                repository.insert(request)
-            } catch (_: DuplicateKeyException) {
-                throw DuplicateEmailException(request.email!!.trim())
-            }
+        val client = service.create(request)
         return ResponseEntity.created(URI.create("/clients/${client.id}")).body(client)
     }
 
@@ -43,5 +35,5 @@ class ClientController(
     @Operation(summary = "Fetch a client by id")
     fun get(
         @PathVariable id: UUID,
-    ): Client = repository.findById(id) ?: throw ResourceNotFoundException("Client", id)
+    ): Client = service.get(id)
 }

@@ -1,6 +1,6 @@
 package com.advisorsearch.seed
 
-import com.advisorsearch.clients.ClientRepository
+import com.advisorsearch.clients.ClientService
 import com.advisorsearch.clients.CreateClientRequest
 import com.advisorsearch.documents.CreateDocumentRequest
 import com.advisorsearch.documents.DocumentRepository
@@ -29,7 +29,7 @@ private const val DOCUMENTS = "seed/documents"
  */
 @Service
 class SeedService(
-    private val clients: ClientRepository,
+    private val clients: ClientService,
     private val documents: DocumentRepository,
     private val documentService: DocumentService,
     private val objectMapper: ObjectMapper,
@@ -69,7 +69,7 @@ class SeedService(
             val client =
                 clients.findByEmail(seedClient.email)
                     ?: clients
-                        .insert(
+                        .create(
                             CreateClientRequest(
                                 firstName = seedClient.firstName,
                                 lastName = seedClient.lastName,

@@ -109,5 +109,4 @@ class DocumentSearchRepository(
             // DISTINCT ON has to lead with the grouping column, so the rows come back ordered by
             // document id. Relevance order is restored here.
             .sortedWith(compareByDescending<DocumentMatch> { it.score }.thenBy { it.reference.id })
-
 }

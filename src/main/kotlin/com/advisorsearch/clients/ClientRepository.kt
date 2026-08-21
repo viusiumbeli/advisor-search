@@ -34,7 +34,7 @@ private fun ResultSet.socialLinks(): List<String> {
 class ClientRepository(
     private val jdbc: JdbcClient,
 ) {
-    fun insert(request: CreateClientRequest): Client =
+    fun insert(client: NewClient): Client =
         jdbc
             .sql(
                 """
@@ -42,11 +42,11 @@ class ClientRepository(
                 VALUES (:firstName, :lastName, :email, :description, :socialLinks)
                 RETURNING id, first_name, last_name, email, description, social_links
                 """.trimIndent(),
-            ).param("firstName", request.firstName!!.trim())
-            .param("lastName", request.lastName!!.trim())
-            .param("email", request.email!!.trim())
-            .param("description", request.description?.trim()?.ifEmpty { null })
-            .param("socialLinks", request.socialLinks.toTypedArray())
+            ).param("firstName", client.firstName)
+            .param("lastName", client.lastName)
+            .param("email", client.email)
+            .param("description", client.description)
+            .param("socialLinks", client.socialLinks.toTypedArray())
             .query(clientRowMapper)
             .single()
 

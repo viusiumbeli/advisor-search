@@ -1,6 +1,6 @@
 package com.advisorsearch.documents
 
-import com.advisorsearch.clients.ClientRepository
+import com.advisorsearch.clients.ClientService
 import com.advisorsearch.config.IngestProperties
 import com.advisorsearch.embedding.EmbeddingService
 import com.advisorsearch.support.InvalidRequestException
@@ -16,7 +16,7 @@ private const val SUMMARY_PASSAGES = 3
 @Service
 class DocumentService(
     private val documents: DocumentRepository,
-    private val clients: ClientRepository,
+    private val clients: ClientService,
     private val embeddings: EmbeddingService,
     private val properties: IngestProperties,
 ) {
@@ -33,25 +33,24 @@ class DocumentService(
         // Checked before any embedding: rejecting an unknown client should not cost model inference.
         if (!clients.exists(clientId)) throw ResourceNotFoundException("Client", clientId)
 
-        val title = request.title!!.trim()
-        val content = request.content!!.trim()
-        if (content.length > properties.maxContentLength) {
+        val newDocument = request.toNewDocument()
+        if (newDocument.content.length > properties.maxContentLength) {
             throw InvalidRequestException(
-                "content is ${content.length} characters, which exceeds the " +
+                "content is ${newDocument.content.length} characters, which exceeds the " +
                     "${properties.maxContentLength} character limit for a single document",
             )
         }
 
-        val chunks = embeddings.chunk(content)
-        val (vectors, embedTime) = measureTimedValue { embeddings.embedChunks(title, chunks) }
+        val chunks = embeddings.chunk(newDocument.content)
+        val (vectors, embedTime) = measureTimedValue { embeddings.embedChunks(newDocument.title, chunks) }
 
         val document =
-            documents.insertWithChunks(clientId, title, content, chunks, vectors, embeddings.modelId)
+            documents.insertWithChunks(clientId, newDocument.title, newDocument.content, chunks, vectors, embeddings.modelId)
         log.info(
             "Ingested document {} for client {}: {} characters, {} chunks, embedded in {}",
             document.id,
             clientId,
-            content.length,
+            newDocument.content.length,
             chunks.size,
             embedTime,
         )
@@ -74,5 +73,4 @@ class DocumentService(
             passages = passages,
         )
     }
-
 }

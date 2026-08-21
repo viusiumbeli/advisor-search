@@ -60,10 +60,10 @@ class SearchApiTest
 
         @Test
         fun `a blank query is rejected as problem json`() {
+            // Rendered by built-in method validation on the @NotBlank controller parameter.
             mockMvc.get("/search") { param("q", "   ") }.andExpect {
                 status { isBadRequest() }
                 content { contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON) }
-                jsonPath("$.detail") { value(org.hamcrest.Matchers.containsString("non-blank")) }
             }
         }
 

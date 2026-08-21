@@ -2,6 +2,7 @@ package com.advisorsearch.search
 
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.constraints.NotBlank
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -20,7 +21,9 @@ class SearchController(
                 "similarities in 0..1, document hits are reciprocal-rank-fusion weights.",
     )
     fun search(
-        @RequestParam q: String,
-        @RequestParam(required = false) limit: Int?,
+        // Built-in method validation renders a blank q as a problem+json 400; a nullable limit is
+        // already optional, no `required = false` needed.
+        @RequestParam @NotBlank q: String,
+        @RequestParam limit: Int?,
     ): List<SearchHit> = service.search(q, limit)
 }

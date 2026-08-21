@@ -35,5 +35,4 @@ class OpenApiConfig {
                         .description("Only required on the deployed instance; local runs need no key."),
                 ),
             ).addSecurityItem(SecurityRequirement().addList(API_KEY))
-
 }
