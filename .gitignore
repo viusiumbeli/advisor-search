@@ -1,0 +1,15 @@
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# The ONNX model and tokenizer are provisioned by `./gradlew provisionModel`, not committed.
+models/*
+!models/checksums.sha256
+
+.DS_Store
+.idea/
+*.iml
+.kotlin/
+
+# Local working notes; not part of the deliverable.
+/notes/

@@ -1,0 +1,98 @@
+spring:
+  application:
+    name: advisor-search
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/advisor_search}
+    username: ${DB_USERNAME:advisor}
+    password: ${DB_PASSWORD:advisor}
+  flyway:
+    enabled: true
+  jackson:
+    # The task's OpenAPI fragment uses first_name / client_id / created_at, so the whole API speaks
+    # snake_case rather than annotating every field.
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_null
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: ${PORT:8080}
+  error:
+    whitelabel:
+      enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+
+embedding:
+  model-path: ${EMBEDDING_MODEL_PATH:models/model.onnx}
+  tokenizer-path: ${EMBEDDING_TOKENIZER_PATH:models/tokenizer.json}
+  # Recorded on every chunk row; changing it without reindexing is a startup failure.
+  model-id: all-MiniLM-L6-v2
+  # The model's own position-embedding limit. Text longer than this is truncated by the encoder,
+  # which is why the chunker keeps every chunk comfortably below it.
+  max-tokens: 256
+  chunk-tokens: 200
+  chunk-overlap-tokens: 30
+
+search:
+  default-limit: 10
+  max-limit: 50
+  # Cosine floor applied to chunk hits before fusion. Ranks cannot express a relevance cut-off, so
+  # the threshold has to be applied while the scores still exist.
+  #
+  # Deliberately coarse. Measured on this corpus, genuinely relevant documents score between 0.33
+  # and 0.79 while irrelevant ones reach 0.38, so the two ranges overlap and no threshold separates
+  # them. 0.30 is set to reject queries with no answer at all (nonsense scores at most 0.21) rather
+  # than to judge relevance, which the relative floor below and fusion do instead.
+  semantic-floor: 0.30
+
+  # The second half of the semantic cut-off, and the one that decides how long a result page is.
+  # The absolute floor answers "is there any answer at all"; this answers "how many of these are as
+  # good as the best one". Measured on this corpus, the document a query is really about is the top
+  # semantic hit for 15 of the 18 evaluation queries, and never scores below 0.76 of the best hit,
+  # so 0.70 keeps every one of them and discards the long tail of loosely-related documents.
+  semantic-floor-ratio: 0.70
+
+  # Lexical floor, expressed relative to the best ts_rank_cd for the same query rather than as an
+  # absolute number, because ts_rank_cd has no meaningful absolute scale. Measured on this corpus,
+  # genuine secondary matches score 0.50 to 0.58 of the best hit while incidental ones — a document
+  # that happens to contain "burden of proof" — score 0.03 and below. 0.05 sits in that gap.
+  keyword-floor-ratio: 0.05
+
+  # pg_trgm's `<%` operator threshold, set per search transaction.
+  word-similarity-threshold: 0.5
+  # Queries shorter than this (in alphanumeric characters) skip the fuzzy arm: trigram similarity
+  # over one or two characters is noise.
+  min-fuzzy-query-length: 3
+  candidate-documents: 30
+  candidate-chunks: 50
+  # Reciprocal rank fusion constant from Cormack et al., SIGIR 2009; also the default in
+  # Elasticsearch, OpenSearch and Azure AI Search.
+  rrf-k: 60
+
+ingest:
+  max-content-length: 100000
+
+api:
+  # Empty means no authentication, which is the local docker compose default. The deployed
+  # instance sets API_KEY and then every endpoint except the health probes requires X-API-Key.
+  key: ${API_KEY:}
+
+logging:
+  level:
+    com.advisorsearch: INFO
