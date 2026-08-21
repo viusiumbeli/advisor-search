@@ -1,0 +1,115 @@
+THE TANAKA FAMILY DISCRETIONARY SETTLEMENT
+
+Plain-English Summary of the Trust Deed and Guide to Trustee Responsibilities
+
+Prepared for: Yuki Tanaka, newly appointed trustee
+Prepared by: Margaret Ellison, Harwood & Vane LLP, 14 Priorsgate, Winchester
+Date: 20 August 2026
+Our reference: HV/TAN/2019/0347
+
+Introduction
+
+You were appointed as a trustee of the Tanaka Family Discretionary Settlement by a deed of appointment dated 7 July 2026. This note is intended to give you, in plain English, a working understanding of the trust deed and of what the law expects of you as a trustee. It is a summary only. It does not replace the deed itself, and where this note and the deed differ, the deed governs. You should read the deed in full at least once; a bound copy accompanies this letter, together with the letter of wishes, the last three years of trust accounts and the minutes of the trustees' meetings since 2023.
+
+Nothing in this note is tax or legal advice on any specific decision. Its purpose is orientation. When a real decision arises, the trustees take advice on that decision.
+
+What the Trust Is and Who Created It
+
+The Tanaka Family Discretionary Settlement is a discretionary trust governed by the law of England and Wales. It was created by your father, Hiroshi Tanaka, as settlor, by a deed of settlement dated 12 June 2019. On that date he transferred £850,000 into the trust, made up of £150,000 in cash and an investment portfolio then worth approximately £700,000. As at 31 March 2026 the trust fund was valued at £1,342,600.
+
+A discretionary trust means that no beneficiary owns any part of the trust fund and no beneficiary has a right to demand anything from it. The trustees, acting together, decide whether to pay out income or capital, to whom among the beneficiaries, how much and when. That discretion is the defining feature of the settlement and the source of most of your responsibilities.
+
+The current trustees are you, your brother Kenji Tanaka, and Ashcombe Trustees Limited, a professional trustee company. The settlor was an original trustee but retired on 3 March 2025 and now has no formal role, although his wishes remain relevant, as explained below. The trust is registered on HMRC's Trust Registration Service under reference URN-EXMPL-4471, and Ashcombe Trustees Limited maintains that registration.
+
+The Class of Beneficiaries
+
+Clause 4 of the deed defines the beneficiaries as a class rather than as named individuals with fixed shares. The class comprises: the children and remoter descendants of the settlor; the spouses and civil partners of those descendants; and any charity registered in England and Wales that the trustees add by deed. The settlor and his wife, Emiko Tanaka, are expressly excluded from benefit for the lifetime of the trust. That exclusion matters for tax reasons and must never be undone; a payment to either of them, direct or indirect, would have serious tax consequences and would breach the deed.
+
+At present the living members of the class are you, Kenji, your sister Aiko Tanaka-Reid, her husband Daniel Reid, and Aiko's two children, Sora (born 2018) and Ren (born 2021). Being in the class gives none of them an entitlement. A beneficiary may ask; only the trustees decide. The trust has a perpetuity period of 125 years from 12 June 2019, so the class will change over the decades as people are born, marry and die.
+
+The Trustees' Discretionary Powers over Income and Capital
+
+Clauses 5 to 8 of the deed give the trustees very wide powers. In summary:
+
+Income. The trustees may pay or apply income to or for the benefit of any one or more of the beneficiaries, in whatever shares they choose. Income not distributed within a reasonable period is accumulated, that is, added to capital. The trustees have accumulated most income since 2019; the accounts show accumulated income of £96,400 at 31 March 2026.
+
+Capital. The trustees may advance or appoint capital to any beneficiary, again in any shares. They may also create sub-trusts for a beneficiary, lend money to a beneficiary on whatever terms they think appropriate, and buy assets for a beneficiary's use. In November 2025 the trustees advanced £40,000 to Aiko towards the purchase of a home; the minute of 18 November 2025 records the reasons.
+
+Wide as they are, these powers must be exercised properly. That means: only for the purposes of the trust; after genuine consideration of the beneficiaries' circumstances; without taking into account irrelevant matters; and never for the trustees' own benefit. A decision reached carelessly or for the wrong reasons can be challenged and unwound by a court. The protection for trustees is a good process, taken advice, and a clear written record.
+
+The Letter of Wishes
+
+Alongside the deed, the settlor signed a letter of wishes on 12 June 2019 and replaced it with an updated letter on 3 March 2025, the day he retired as trustee. The letter explains what he hopes the trustees will do: broadly, that the fund should be used first for the education and housing needs of his grandchildren, that his children should be assisted at times of genuine need rather than by routine distributions, and that the fund should not be exhausted within the first twenty-five years.
+
+You must understand the status of this letter. It is guidance, not instruction. It is not legally binding, and it must not be treated as binding. Trustees who simply do whatever a letter of wishes says, without exercising their own judgement, are failing in their duty just as surely as trustees who ignore it. The correct approach is to read it, give it serious weight as evidence of the settlor's intentions, and then make your own decision on the facts in front of you. The letter is confidential to the trustees and their advisers; beneficiaries have no automatic right to see it.
+
+Statutory Duties: The Duty of Care, Investment and Advice
+
+Beyond the deed, the Trustee Act 2000 imposes duties on you personally.
+
+The duty of care. You must exercise such care and skill as is reasonable in the circumstances, taking into account any special knowledge or experience you have or hold yourself out as having. You work in software, not in finance, and the law does not expect you to behave like a fund manager. It does expect you to be diligent, to ask questions, to read the papers before meetings and to speak up when something is unclear. Ashcombe Trustees Limited, as a professional trustee, is held to a higher standard, but its presence does not dilute your own duty. Each trustee is responsible for every decision the trustees make together.
+
+The standard investment criteria. Whenever the trustees exercise any power of investment, and at regular intervals afterwards, they must have regard to two things: the suitability of the investments to the trust (both the kind of investment and the particular holding), and the need for diversification so far as appropriate to the trust's circumstances. In practice the trustees discharge this by reviewing the portfolio against the written investment policy statement at each meeting.
+
+The duty to take proper advice. Before exercising investment powers, and when reviewing investments, the trustees must obtain and consider proper advice from someone reasonably believed to be qualified to give it, unless the trustees reasonably conclude that advice is unnecessary or disproportionate (for example, for a small cash decision). The trust's investment adviser fulfils this role for portfolio matters; Harwood & Vane advises on legal questions; Calder Whitmore LLP, chartered accountants of Leeds, prepares the accounts and tax returns.
+
+Delegation and the Investment Manager
+
+Trustees cannot do everything themselves, and the Act allows them to delegate certain functions, including asset management. In September 2019 the trustees appointed Pelham Court Investment Management LLP as discretionary investment manager. Three safeguards apply, and you should check each of them is being observed:
+
+First, the delegation is in writing. The investment management agreement dated 9 September 2019, as amended on 14 May 2025, sets out the manager's authority and its fees, currently 0.65 per cent per annum of assets under management.
+
+Second, the trustees have given the manager a written policy statement. The current statement, adopted 14 May 2025, sets a medium-risk mandate: 55 to 70 per cent global equities, 20 to 35 per cent investment-grade bonds, the balance in cash and infrastructure funds, with no single holding above 5 per cent of the portfolio and no unquoted investments. The manager must comply with it.
+
+Third, the arrangement must be kept under review. The trustees consider the manager's performance, its compliance with the policy statement and whether the delegation should continue at every meeting, and they record that consideration in the minutes. Delegating management does not delegate responsibility: the trustees remain answerable for the choice of manager and for keeping the arrangement suitable.
+
+Certain functions cannot be delegated at all, chiefly the decision whether and how to distribute income or capital. Those decisions are always the trustees' own.
+
+Record Keeping and Trustee Meetings
+
+The trustees meet at least twice a year, normally in May and November, and otherwise as decisions require. Meetings can be held by video call. Decisions are taken unanimously; the deed does not permit majority voting, so nothing happens unless all three trustees agree.
+
+Ashcombe Trustees Limited acts as the administering trustee. It keeps the trust's records: the deed and all supplemental deeds, minutes of every meeting and of every written resolution, annual accounts, tax returns and HMRC correspondence, the investment reports from Pelham Court, distribution records, and the register of beneficiaries' details required for the Trust Registration Service. The trust's bank account is held with Alderbrook Bank plc, account ending 8027, and requires two trustee signatures for any payment.
+
+Good minutes are the trustees' best protection. Every substantive decision, especially a distribution or a refusal of a beneficiary's request, should be minuted with the reasons, the information considered and the advice received. If you ever find yourself unable to explain from the file why a decision was made, the record keeping has failed.
+
+The Trust's Tax Position
+
+The settlement is within the inheritance tax regime known as the relevant property regime. Three consequences follow.
+
+Ten-year anniversary charges. On each tenth anniversary of the trust's creation, the first being 12 June 2029, the trust is charged inheritance tax on the value of the trust fund above the available nil rate band (currently £325,000), at a maximum effective rate of 6 per cent. On current values the 2029 charge is likely to be of the order of £55,000 to £60,000, and the trustees are already planning for the liquidity to pay it. Calder Whitmore will prepare the calculation and the return.
+
+Exit charges. When capital leaves the trust between anniversaries, a proportionate exit charge can arise, based on the time elapsed since the last anniversary (or since creation, before the first anniversary). The £40,000 advance to Aiko in November 2025 carried a small exit charge, which the trustees paid from the fund. Before any capital distribution the trustees should ask the accountants to quantify the exit charge so it can be taken into account.
+
+Income tax and capital gains tax. The trust pays income tax at the rates applicable to trusts, currently 45 per cent on most income and 39.35 per cent on dividends, and capital gains tax at 24 per cent on gains above its annual exempt amount, which is half the personal one. The trust files a self assessment return each year; the return for the year to 5 April 2026 was submitted on 30 June 2026 and showed tax payable of £11,830.
+
+Distributions and Beneficiaries' Tax Certificates
+
+When the trustees distribute income to a beneficiary, the payment carries a 45 per cent tax credit. The trustees must give the beneficiary a certificate on form R185 (Trust Income) showing the net payment and the tax credit. A beneficiary who pays tax at less than 45 per cent can reclaim some or all of that credit from HMRC, which often makes income distributions to lower-rate beneficiaries tax-efficient. The trustees must maintain a sufficient pool of tax already paid to frank these credits; the accountants track this pool and should be consulted before any income distribution is decided. Capital distributions do not carry an R185 but may, as above, trigger an exit charge, and the trustees should tell the beneficiary in writing that the payment is capital.
+
+Conflicts of Interest
+
+You are both a trustee and a member of the beneficial class. That is common in family trusts and entirely lawful, but it demands discipline. If the trustees are considering a distribution to you, you must declare the conflict, and the deed requires that you take no part in the decision; the other two trustees decide, and the minute must record your abstention. The same applies to Kenji. More generally, you must never place yourself in a position where your personal interests conflict with your duty without full disclosure to your co-trustees, you must not profit from the trusteeship beyond any remuneration the deed permits (none, for lay trustees, other than expenses), and you must not buy assets from or sell assets to the trust.
+
+Appointment and Retirement of Trustees
+
+Clause 12 gives the power to appoint new trustees and to remove trustees to the settlor during his life, and after his death to the trustees themselves. Your own appointment was made by the settlor under this clause by the deed of 7 July 2026. A trustee may retire by deed provided at least two trustees, or a trust corporation, remain in office afterwards. On any change of trustee, the trust's assets must be transferred into the names of the continuing trustees, the bank mandate updated, and the Trust Registration Service record amended within 90 days. Ashcombe Trustees Limited handles the mechanics, but the continuing trustees are responsible for seeing that it is done.
+
+What to Do First
+
+Practical first steps, most of which we can help you complete before the November 2026 meeting:
+
+Read the deed of settlement, the 2025 letter of wishes and the minutes from 2023 onwards. Note anything you do not understand and raise it.
+
+Complete the identity verification pack that Ashcombe Trustees Limited has sent you, so you can be added to the bank mandate and the Trust Registration Service record.
+
+Review the investment policy statement and Pelham Court's June 2026 report, so you can take a considered part in the portfolio review at the next meeting.
+
+Diarise the meeting dates and the key deadlines: the 31 January self assessment payment date, and the June 2029 ten-year anniversary.
+
+Tell your co-trustees now of any circumstances that could create a conflict, and keep them informed if that changes.
+
+If anything in this note is unclear, contact me at m.ellison@harwoodvane.example or the administering trustee at trustees@ashcombetrustees.example. Trusteeship is a serious office, but it is a manageable one: ask early, decide together, take advice, and write everything down.
+
+Margaret Ellison
+Partner, Harwood & Vane LLP

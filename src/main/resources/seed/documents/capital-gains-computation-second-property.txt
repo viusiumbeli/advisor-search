@@ -1,0 +1,72 @@
+CAPITAL GAINS TAX COMPUTATION
+Disposal of residential property: 9 Coleridge Row, Bath BA1 9GT
+
+Client: Beatrice Moreau (client reference ASH-002233)
+Prepared by: Daniel Okafor ATT, Ashcombe Wealth Management LLP
+Date of computation: 29 September 2025
+Tax year of disposal: 2025/26
+
+Background
+
+Mrs Moreau completed the sale of 9 Coleridge Row, Bath on 12 September 2025. The property was acquired on 14 June 2011 and was her only or main residence from acquisition until 31 October 2016, when she moved to Bristol. It was let on an assured shorthold tenancy from 1 December 2016 until the tenants vacated on 30 April 2025, and was then marketed for sale. Mrs Moreau is a higher rate taxpayer, with taxable income of approximately 86,400 pounds in 2025/26.
+
+Disposal Proceeds
+
+Gross sale price: 545,000.00
+Less incidental costs of disposal:
+Estate agency commission (1.2 per cent): 6,540.00
+Conveyancing fees and disbursements: 1,480.00
+Net disposal proceeds: 536,980.00
+
+Acquisition Cost
+
+Purchase price (14 June 2011): 276,000.00
+Stamp duty land tax paid on acquisition: 8,280.00
+Legal fees and survey on purchase: 1,265.00
+Total allowable acquisition cost: 285,545.00
+
+Enhancement Expenditure
+
+Two items of capital expenditure qualify, both reflected in the state of the property at disposal and supported by contractor invoices on file.
+Loft conversion with rear dormer (completed August 2013): 31,800.00
+Single-storey rear extension (completed March 2016): 47,200.00
+Total enhancement expenditure: 79,000.00
+
+Gain Before Reliefs
+
+Net disposal proceeds of 536,980.00, less acquisition cost of 285,545.00 and enhancement expenditure of 79,000.00, gives a gain before reliefs of 172,435.00.
+
+Private Residence Relief
+
+Total period of ownership: 14 June 2011 to 12 September 2025, taken as 171 months.
+Actual occupation as main residence: 14 June 2011 to 31 October 2016, taken as 64 complete months.
+Final period exemption: the last 9 months of ownership (13 December 2024 to 12 September 2025) qualify automatically and do not overlap with actual occupation.
+Qualifying months: 64 plus 9, being 73 of 171 months.
+
+Relief: 172,435.00 multiplied by 73/171 equals 73,613.00.
+
+Lettings Relief
+
+The property was let for most of the period after Mrs Moreau moved out. However, for disposals from 6 April 2020 lettings relief is available only where the owner was in shared occupancy with the tenant. Mrs Moreau did not occupy any part of the property during the tenancy, so no lettings relief is due. Nil claimed.
+
+Annual Exempt Amount
+
+Gain after private residence relief: 172,435.00 less 73,613.00 equals 98,822.00.
+Less annual exempt amount for 2025/26: 3,000.00 (no other disposals in the year).
+Taxable gain: 95,822.00.
+
+Rate and Tax Due
+
+As a higher rate taxpayer disposing of UK residential property, the whole taxable gain falls at the 24 per cent residential property rate. None of the basic rate band is available.
+
+Capital gains tax due: 95,822.00 at 24 per cent equals 22,997.28.
+
+Reporting and Payment
+
+Because this is a disposal of UK residential property by a UK resident with tax due, a return through the HMRC Capital Gains Tax on UK Property service was required, with payment on account, within 60 days of completion. Completion was 12 September 2025, so the deadline fell on 11 November 2025.
+
+The online return was submitted on 21 October 2025 (HMRC reference on file) and the payment of 22,997.28 was made the same day, well within the deadline. The disposal must also be reported on the 2025/26 Self Assessment return, where the payment on account will be credited against the final liability.
+
+Notes and Assumptions
+
+Figures for enhancement expenditure exclude redecoration and like-for-like repairs, which are revenue in nature. The apportionment of months follows the working schedule attached to the client file. If Mrs Moreau's final 2025/26 income differs materially from the estimate above, the rate applied will be unaffected because her income already exceeds the higher rate threshold, but the Self Assessment reconciliation should be checked before filing on 31 January 2027.

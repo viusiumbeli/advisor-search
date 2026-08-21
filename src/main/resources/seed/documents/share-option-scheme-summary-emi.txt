@@ -1,0 +1,36 @@
+QUAYMARSH SOFTWARE LTD
+Enterprise Management Incentive (EMI) Share Option Scheme
+Summary for option holder: Ms Amara Okonkwo
+Prepared 30 May 2025 by the company secretary
+
+This summary explains the principal terms of your EMI option. It does not replace the option agreement dated 12 May 2025, which is the binding document, and it is not tax advice.
+
+Grant details
+
+You were granted options on 12 May 2025 over 40,000 ordinary shares of £0.001 each in Quaymarsh Software Ltd (registered in England, company number 14829377). The exercise price is £1.32 per share, giving a total exercise cost of £52,800 if you exercise in full. The actual market value of a share at grant was agreed with HMRC Shares and Assets Valuation on 28 April 2025 (company reference QMS/EMI/2025/117) at £1.32, with an unrestricted market value of £1.47. Because the exercise price equals the agreed actual market value at grant, no income tax should arise on exercise provided the conditions below are met.
+
+Vesting schedule
+
+Your options vest over 48 months from the grant date, subject to a 12-month cliff. No options vest before 12 May 2026, on which date 10,000 options (25 per cent) vest. The remaining 30,000 vest in 36 equal monthly instalments of 833 or 834, completing on 12 May 2029. Vesting stops on the date you cease employment.
+
+Exercise conditions
+
+This is an exit-only scheme. Vested options become exercisable only immediately before an exit, defined in the agreement as a sale of more than 50 per cent of the company's ordinary shares, a sale of substantially all of its assets, or an admission of the shares to a recognised stock exchange. The board may, at its discretion, accelerate vesting of unvested options on an exit. If no exit has occurred within ten years of the grant date the options lapse; exercise more than ten years after grant would in any event lose EMI tax treatment. Unexercised options normally lapse when you leave employment, subject to good-leaver discretion.
+
+Disqualifying events
+
+The favourable tax treatment can be lost through a disqualifying event. The main ones for you to avoid are: ceasing to be an employee; your committed working time falling below 25 hours a week or, if lower, 75 per cent of your total working time; a variation of the option terms that increases the value of the shares; and the company becoming a 51 per cent subsidiary of another company. If a disqualifying event occurs, you have 90 days to exercise while preserving full relief; growth in value after that window is taxed as employment income.
+
+Income tax and national insurance
+
+No income tax or national insurance arises on grant. On exercise, provided the option is exercised within ten years, the exercise price is not below the agreed actual market value at grant, and no unremedied disqualifying event has occurred, no income tax or employee or employer national insurance is due.
+
+Capital gains tax and business asset disposal relief
+
+On a sale of the shares, capital gains tax applies to the difference between your sale proceeds and the exercise price, less your annual exempt amount (£3,000 for 2025/26). Because the shares derive from an EMI option, business asset disposal relief is available without the usual 5 per cent shareholding test, provided at least 24 months pass between the grant date and the disposal and you remain an employee throughout. The relief rate is 14 per cent for disposals in 2025/26, rising to 18 per cent from 6 April 2026, within the £1 million lifetime limit. Gains not qualifying for the relief are taxed at the standard rates, currently up to 24 per cent.
+
+Notification deadline
+
+The company must notify the grant to HMRC through the Employment Related Securities online service by 6 July following the end of the tax year of grant: for this grant, by 6 July 2026. The company secretary owns this deadline; a missed notification would forfeit EMI status for the option. An annual ERS return is also due by 6 July each year.
+
+Questions: options@quaymarsh.example.

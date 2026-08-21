@@ -1,0 +1,43 @@
+Westmarch Energy
+Electricity Account Statement
+
+Account number: WME-0447-2281-9
+Statement date: 3 March 2026
+Statement number: 2026-02-118441
+
+Customer: Mr Marcus Delacroix-Whitfield
+Supply address: 14 Marlow Court, Bristol BS8 4QR
+
+Billing period: 1 February 2026 to 28 February 2026
+
+Your meter and readings
+
+Meter serial number: K93E 044771
+Opening reading on 1 February 2026: 45218 (actual, smart meter)
+Closing reading on 28 February 2026: 45610 (actual, smart meter)
+Units consumed this period: 392 kWh
+
+Charges for this period
+
+Energy used: 392 kWh at a unit rate of 24.86p per kWh comes to £97.45.
+
+Standing charge: 28 days at 53.80p per day comes to £15.06.
+
+Charges before VAT: £112.51
+VAT at 5 per cent: £5.63
+
+Total amount due: £118.14
+
+Paying your bill
+
+You pay by monthly Direct Debit. We will collect £118.14 from your nominated bank account on 17 March 2026, which is the payment due date shown on this statement. There is nothing you need to do. If the collection date falls on a weekend or a bank holiday, we will take the payment on the next working day. The Direct Debit Guarantee protects you if an error is ever made in the collection of your payment.
+
+About your tariff
+
+You are on our Fixed Saver 12 tariff, which ends on 31 July 2026. We will write to you at least 42 days before that date with your renewal options. If you do nothing when the tariff ends, you will move to our standard variable tariff, which is currently more expensive at 27.94p per kWh, so it is worth choosing a new fixed deal before then.
+
+Your usage compared
+
+You used 392 kWh this February, compared with 431 kWh in February 2025, a reduction of about 9 per cent. Well done.
+
+Questions about this statement? Write to enquiries@westmarch-energy.example or call our Bristol team, Monday to Friday, 8am to 6pm.

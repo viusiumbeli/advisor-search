@@ -1,0 +1,44 @@
+BUY-TO-LET PORTFOLIO REVIEW
+
+Prepared for: Dr Priya Raghunathan
+Prepared by: Marcus Feld, Chartered Financial Planner, Aldgate Wealth Ltd
+Date: 19 May 2026
+Reference: PR-2216-BTL
+
+Background and objectives
+
+Dr Raghunathan is a salaried GP in Leicester with pensionable NHS earnings of £116,400 in 2025/26, making her a higher-rate taxpayer before any rental income is considered. She holds four residential investment properties in her sole name, acquired between 2009 and 2020, with an aggregate estimated value of £864,000 against mortgage debt of £400,000, a portfolio loan-to-value of 46 per cent. Her stated objectives are to protect net income from the finance cost restriction, to settle the question of incorporation, to plan for energy efficiency works, and to decide whether the portfolio should be reduced.
+
+Property one: 22 Rookery Lane, Leicester LE2 8FD
+
+Purchased March 2014 for £168,000; current estimated value £245,000. Outstanding interest-only mortgage of £96,000, fixed at 5.09 per cent until August 2027. Let at £1,150 per month (£13,800 a year) under an assured shorthold tenancy that began on 1 October 2025. Gross yield 5.6 per cent; net yield after interest, insurance and management approximately 3.7 per cent. Void history is good: three weeks in 2022, otherwise continuously let since purchase.
+
+Property two: 7 Danvers Croft, Oadby LE2 5WN
+
+Purchased July 2017 for £212,000; current value £272,000. Interest-only mortgage of £148,000 fixed at 4.62 per cent until January 2028. Rent £1,275 per month (£15,300 a year). Gross yield 5.6 per cent; net yield 3.4 per cent, the interest bill being the largest in the portfolio. No voids since 2019 and the current tenants have renewed twice.
+
+Property three: Flat 5, Marlowe Court, Leicester LE1 3JD
+
+Purchased November 2020 for £141,000; leasehold with 112 years unexpired. Current value £149,000, prices in the block having been essentially static since purchase. Mortgage £102,000 at 5.44 per cent, reverting to the lender's variable rate in November 2026. Rent £850 per month (£10,200 a year). Gross yield 6.8 per cent, but a service charge of £1,940 a year, up 31 per cent in three years, and ground rent of £250 reduce the net yield to roughly 1.9 per cent, the weakest in the portfolio. Void history is the worst of the four: two voids totalling eleven weeks, in 2023 and 2025.
+
+Property four: 88 Elmsett Drive, Wigston LE18 6RP
+
+Purchased September 2009 for £119,000; the oldest and lowest-specification property. Current value £198,000. Repayment mortgage of £54,000 at 4.15 per cent. Rent £995 per month (£11,940 a year). Gross yield 6.0 per cent; net yield 4.1 per cent. One void of five weeks in summer 2024 while damp remediation was completed. The EPC rating is E (48 points), on which see below.
+
+Finance cost restriction
+
+Mortgage interest across the portfolio is about £20,700 a year. Since the restriction took full effect, none of it is deductible from rental profits; instead a basic-rate credit of 20 per cent is given. In 2025/26 gross rents were £51,240 and allowable non-finance expenses £12,300, producing taxable property profits of £38,940. At 40 per cent the tax is £15,576, reduced by a credit of £4,140, leaving £11,436 payable. The cash profit after interest was only £18,240, so the effective rate on cash profit is about 63 per cent. The gross-of-interest figure also inflates adjusted net income to roughly £155,000, extinguishing the personal allowance. This is the central economic problem with the portfolio in its current form.
+
+Incorporation: for and against
+
+A company deducts interest in full and pays corporation tax at 19 to 25 per cent, retained profits can fund further purchases, and shares are more flexible for inheritance planning. Against that, transferring the existing properties is a disposal at market value: gains of roughly £224,000 would attract capital gains tax of around £50,000 unless incorporation relief applied, and relief under section 162 requires a genuine property business, which four externally managed lets held alongside full-time GP work is unlikely to satisfy. Stamp duty land tax on the transfer, including the additional dwellings surcharge, would be approximately £38,000. Limited company mortgage pricing typically runs 0.75 to 1.25 percentage points higher, and extracting profits as dividends creates a second layer of tax. On this scale the entry costs would take well over a decade to recover. We do not recommend incorporation unless Dr Raghunathan intends to expand materially.
+
+EPC requirements and works at Elmsett Drive
+
+The current legal minimum for letting is EPC E, which all four properties meet: Rookery Lane and Danvers Croft are rated C, Marlowe Court B, and Elmsett Drive E. Government proposals would require C for existing tenancies by 2030, so the Elmsett Drive rating carries real risk. A quotation from Kettleby Energy Works Ltd dated 30 April 2026 covers loft insulation top-up, cavity wall insulation, a replacement condensing boiler and draught-proofing at £9,420 including VAT, projected to lift the rating to C (69 points). We recommend booking the works for August 2026 with the tenant's agreement; most of the cost is revenue in nature and deductible against rents, and the boiler element should be phased in the same tax year.
+
+Recommendation
+
+Sell Flat 5, Marlowe Court. It combines the lowest net yield, the worst void record, stagnant capital value, escalating leasehold costs and an imminent reversion to a variable mortgage rate. Net proceeds after redeeming £102,000 and paying selling costs should be about £41,000; the gain is small, and after the £3,000 annual exempt amount the capital gains tax should be near £1,100 at 24 per cent. Applying the proceeds against the Rookery Lane loan at its August 2027 refinance would cut portfolio gearing to around 40 per cent, materially reduce the interest exposed to the finance cost restriction, and lift portfolio net income. Retain the other three properties personally and revisit this analysis at the May 2027 review.
+
+Property values are estimates and can fall as well as rise. Tax treatment depends on individual circumstances and may change. This review does not constitute legal or conveyancing advice.

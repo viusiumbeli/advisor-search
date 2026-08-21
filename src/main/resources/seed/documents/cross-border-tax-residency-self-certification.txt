@@ -1,0 +1,54 @@
+COMMON REPORTING STANDARD (CRS)
+INDIVIDUAL TAX RESIDENCY SELF-CERTIFICATION FORM
+
+Ashcombe Wealth Management LLP
+Form CRS-I, version 3.2 (January 2026)
+Client reference: ASH-004417
+
+Part 1 - Identification of Account Holder
+
+Full legal name: Tomasz Piotr Wisniewski
+Date of birth: 3 April 1988
+Town and country of birth: Krakow, Poland
+Nationality: Polish
+Current residential address: Flat 4, 17 Ropewalk Gardens, London SE16 9GD, United Kingdom
+Correspondence address: same as above
+Email: t.wisniewski@rivergate-mail.example
+Telephone: 020 7946 0822
+
+Part 2 - Countries of Tax Residence and Taxpayer Identification Numbers
+
+The account holder declares that he is resident for tax purposes in the following jurisdictions.
+
+Jurisdiction 1: United Kingdom
+Taxpayer identification number: National Insurance number QQ 47 21 88 C
+Self Assessment unique taxpayer reference: 43210 98765
+
+Jurisdiction 2: Poland
+Taxpayer identification number: PESEL 88040312349
+Reason TIN is held: ongoing Polish filing obligation in respect of rental income from a retained flat at ul. Miodowa 14/6, Krakow.
+
+No further jurisdictions are declared. The account holder confirms he holds no United States citizenship or tax residence.
+
+Part 3 - Classification of Account Holder
+
+The account holder certifies that he completes this form as an individual acting in his own capacity. He is not completing the form on behalf of any other person, and he is not an entity, a controlling person of an entity, or a nominee.
+
+Part 4 - Certification
+
+I declare that all statements made in this self-certification are, to the best of my knowledge and belief, correct and complete. I acknowledge that the information contained in this form, together with information about the accounts I hold, may be reported to HM Revenue and Customs and exchanged with the tax authorities of the jurisdictions in which I am resident for tax purposes, under intergovernmental agreements implementing the Common Reporting Standard.
+
+Part 5 - Change of Circumstances Undertaking
+
+I undertake to notify Ashcombe Wealth Management LLP within 30 days of any change in circumstances that affects my tax residency status or causes any information in this form to become incorrect or incomplete, and to provide a suitably updated self-certification within 90 days of such a change.
+
+Signed: Tomasz Piotr Wisniewski
+Date: 10 February 2026
+
+Adviser Note (internal - not part of the client certification)
+
+Prepared by Priya Raghavan, Chartered Financial Planner (p.raghavan@ashcombewealth.example).
+
+Mr Wisniewski arrived in the United Kingdom on 15 September 2025 to begin full-time employment in London. Split year treatment applied for 2025/26 under Case 5 of the statutory residence test (starting full-time work in the UK), so the UK part of the year runs from 15 September 2025 and Polish-source income arising before that date falls outside the UK charge.
+
+He remains within the Polish system because of the retained Krakow flat, which is let at approximately PLN 3,200 per month. Under Article 4 of the UK/Poland double taxation agreement the tie-breaker resolves residence in favour of the United Kingdom from arrival, as his permanent home and centre of vital interests are now here. Article 6 gives Poland primary taxing rights over the rental income; the same income is reportable on his UK Self Assessment return with credit relief for Polish tax paid. Both TINs above have been verified against his Polish identity card and his HMRC correspondence. Next review of this certification is scheduled for February 2027 or on any notified change, whichever is earlier.

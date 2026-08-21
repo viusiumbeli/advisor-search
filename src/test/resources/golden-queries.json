@@ -1,0 +1,38 @@
+{
+  "_comment": [
+    "The evaluation set. Each entry is a query an advisor might realistically type and the single",
+    "result that must come back for it. `expect` matches a document title or a client email.",
+    "It is small and hand-built rather than sampled from traffic, which is the honest limitation:",
+    "it protects against regressions in the behaviour we chose, not against being wrong about what",
+    "advisors actually search for."
+  ],
+  "documents": [
+    { "query": "address proof", "expect": "Electricity Account Statement", "why": "the task's own example: no literal overlap with the bill" },
+    { "query": "proof of address", "expect": "Electricity Account Statement", "why": "same concept, different phrasing" },
+    { "query": "utility bill", "expect": "Electricity Account Statement", "why": "plain semantic match, no expansion needed" },
+    { "query": "who can act for a client if they lose capacity", "expect": "Lasting Power of Attorney", "why": "a whole question, no shared vocabulary with the title" },
+    { "query": "retirement income planning", "expect": "Suitability Report", "why": "topic match against a long document" },
+    { "query": "drawdown sustainability", "expect": "Suitability Report", "why": "a passage buried in a 2500 word report" },
+    { "query": "Kestrel Global Infrastructure", "expect": "Annual Investment Review", "why": "rare exact phrase in the middle of a long document" },
+    { "query": "PLC-88213", "expect": "Policy Schedule", "why": "a reference code: embeddings treat it as noise, full text search does not" },
+    { "query": "inheritance tax on gifts", "expect": "Meeting Notes", "why": "topic match" },
+    { "query": "rental yield", "expect": "Buy-to-Let Portfolio Review", "why": "domain term present in the document" },
+    { "query": "share options vesting", "expect": "EMI Share Option Scheme", "why": "topic match" },
+    { "query": "anti money laundering checks", "expect": "Onboarding Checklist", "why": "hyphenated in the source, unhyphenated in the query" },
+    { "query": "capital gains on a second home", "expect": "Capital Gains Computation", "why": "paraphrase of the title" },
+    { "query": "trustee duties", "expect": "Trust Deed Summary", "why": "topic match against a long document" },
+    { "query": "energy performance certificate", "expect": "Buy-to-Let Portfolio Review", "why": "an obligation mentioned once, not in the title" },
+    { "query": "double taxation treaty", "expect": "CRS Tax Residency", "why": "the document says 'double taxation agreement', so only the semantic arm can reach it" },
+    { "query": "ISA transfer", "expect": "ISA Transfer Confirmation", "why": "exact title tokens" },
+    { "query": "break clause", "expect": "Assured Shorthold Tenancy", "why": "a specific clause inside a summary" }
+  ],
+  "clients": [
+    { "query": "AldgateWealth", "expect": "jane.roe@aldgatewealth.example", "why": "the task's own example: a substring of the email domain" },
+    { "query": "aldgatewealth.example", "expect": "jane.roe@aldgatewealth.example", "why": "the full domain" },
+    { "query": "raghunathan", "expect": "priya.raghunathan@northharbour.example", "why": "surname, lowercase" },
+    { "query": "Delacroix-Whitfeld", "expect": "m.delacroix-whitfield@brackenridge.example", "why": "misspelled surname, reached by word similarity not substring" },
+    { "query": "retired teacher", "expect": "m.delacroix-whitfield@brackenridge.example", "why": "words from the description" },
+    { "query": "Okonkwo", "expect": "amara.okonkwo@quaymarsh.example", "why": "surname with different capitalisation" },
+    { "query": "buy-to-let", "expect": "priya.raghunathan@northharbour.example", "why": "hyphenated phrase in a description" }
+  ]
+}

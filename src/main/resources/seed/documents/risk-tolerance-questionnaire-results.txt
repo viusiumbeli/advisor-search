@@ -1,0 +1,35 @@
+RISK TOLERANCE QUESTIONNAIRE: RESULTS AND ADVISER DISCUSSION
+
+Client: Mr Samuel Ashworth-Bell (client reference HG-2214)
+Adviser: Fiona Mackechnie, Hartwell Grange Financial Planning
+Questionnaire completed: 9 January 2026
+Discussion meeting: 16 January 2026, Hartwell Grange offices, Leeds
+File note prepared: 19 January 2026
+
+Questionnaire result
+
+Samuel completed the firm's 18-question psychometric risk questionnaire online. His raw score was 62 out of 100, which maps to profile 5 of 7, Moderately Adventurous, on the firm's scale (band 58 to 68). A profile 5 portfolio under our current models holds around 70 per cent in equities.
+
+Inconsistent answers
+
+Three answers were flagged by the scoring tool and reviewed in the meeting. At question 6, Samuel disagreed with the statement that he would prefer a smaller guaranteed return to a larger uncertain one, which is a risk-seeking answer. At question 11, however, he agreed that if his investments fell by 15 per cent within a year he would sell some or all of them, which contradicts question 6 and is characteristic of a much lower profile. At question 14 he described himself as an experienced investor comfortable with market movements, yet the fact-find shows 68 per cent of his investable assets currently in cash deposits and premium bonds, held there, in his words, "since the pandemic scare". The combination suggests his score overstates his tolerance.
+
+Attitude to risk and capacity for loss
+
+I explained the distinction. Attitude to risk is psychological: how comfortable he feels with fluctuation. Capacity for loss is financial: how much loss he could absorb without a material effect on his standard of living. These are assessed separately and the lower of the two constrains the recommendation. Samuel is 59 and intends to begin drawing on the portfolio at 65. Beyond a small deferred defined benefit pension of £9,400 a year and his State Pension, the portfolio is his main retirement resource. He has no dependants but an outstanding mortgage of £54,000 due for repayment in 2031. On the firm's framework his capacity for loss is medium-low, which sits below his questionnaire score.
+
+Worked example discussed in the meeting
+
+His proposed investable portfolio is £485,000. I set out what a 20 per cent fall would mean in pounds rather than percentages: a loss of £97,000, taking the portfolio to £388,000. At a sustainable withdrawal rate of 4 per cent, that is the difference between an income of £19,400 a year and £15,520 a year, a reduction of £3,880 every year if the fall proved lasting. I noted that falls of this order occurred in 2020 and 2022 and are a normal feature of equity investment, not a remote scenario.
+
+Client reaction
+
+Samuel paused for some time and said that seeing the figure in pounds "changes things; £97,000 is nearly two years of my consultancy income". He said he had only ever thought about falls in percentage terms and that a fall of that size in the two years before retirement "would keep me up at night". He asked whether he would be forced to sell at the bottom; I explained sequencing risk and the role of a cash buffer, but confirmed that discomfort at this scale is itself relevant evidence.
+
+Agreed profile
+
+After discussion we agreed to record his profile as 4 of 7, Balanced, one band below his questionnaire score, reflecting the inconsistent answers, his medium-low capacity for loss and his reaction to the worked example. The model portfolio at this profile targets 55 per cent in equities. Samuel understood and accepted that the expected long-term return is lower than at profile 5, and preferred that trade-off. The rationale will be restated in the suitability report before any investment is made.
+
+Review trigger
+
+The profile will be reassessed at every annual review, the next being January 2027, and earlier if any of the following occurs: Samuel ceases consultancy work before age 62; his planned retirement date changes; or the portfolio falls by more than 10 per cent in any quarter, in which case I will contact him rather than wait for him to call. Samuel confirmed he was happy with this approach and the note was read back to him at the end of the meeting.

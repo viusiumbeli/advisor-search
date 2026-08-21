@@ -1,0 +1,41 @@
+{
+  "_comment": [
+    "Domain knowledge that no general-purpose embedding model carries.",
+    "An advisor asking for 'address proof' wants the electricity bill, but nothing in the bill's",
+    "text is distributionally close to that phrase: it talks about meter readings and direct",
+    "debits. Five embedding models were measured on this corpus (all-MiniLM-L6-v2,",
+    "multi-qa-MiniLM-L6-cos-v1, msmarco-MiniLM-L6-cos-v5, e5-small-v2, bge-small-en-v1.5) and all",
+    "five ranked the bill 13th or worse for that query while ranking every other probe first.",
+    "The association is procedural knowledge about which documents evidence what, so it is supplied",
+    "explicitly here rather than hoped for from the model.",
+    "Expansions widen the semantic arm only. The lexical arm exists to match exact tokens, and",
+    "OR-ing extra terms into it would cost precision for recall the semantic arm already provides."
+  ],
+  "rules": [
+    {
+      "concept": "evidence of address",
+      "triggers": ["address proof", "proof of address", "address verification", "evidence of address", "residency proof"],
+      "expansions": ["utility bill", "council tax bill", "bank statement", "tenancy agreement"]
+    },
+    {
+      "concept": "evidence of identity",
+      "triggers": ["proof of identity", "identity proof", "id document", "identity verification", "identity documents"],
+      "expansions": ["passport", "driving licence", "photographic identification", "certified copy of identity document"]
+    },
+    {
+      "concept": "evidence of income",
+      "triggers": ["proof of income", "income proof", "evidence of earnings", "proof of earnings"],
+      "expansions": ["payslip", "P60 end of year certificate", "tax return", "employment contract salary"]
+    },
+    {
+      "concept": "acting for someone who has lost capacity",
+      "triggers": ["power of attorney", "lost capacity", "loss of capacity", "acting on behalf of a client", "mental capacity"],
+      "expansions": ["lasting power of attorney attorney appointed", "donor best interests decisions", "deputy appointed by the court"]
+    },
+    {
+      "concept": "life cover paid on death",
+      "triggers": ["death benefit", "life cover", "life assurance payout", "who inherits the policy"],
+      "expansions": ["sum assured payable on death", "policy written in trust beneficiaries", "whole of life policy schedule"]
+    }
+  ]
+}

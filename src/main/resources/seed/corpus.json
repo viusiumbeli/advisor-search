@@ -1,0 +1,132 @@
+{
+  "clients": [
+    {
+      "first_name": "Jane",
+      "last_name": "Roe",
+      "email": "jane.roe@aldgatewealth.example",
+      "description": "Founder and managing director of a boutique advisory practice. EIS and VCT subscriptions, with concentrated risk from her own business.",
+      "social_links": ["https://links.example/in/jane-roe", "https://aldgatewealth.example/team/jane-roe"],
+      "documents": [
+        { "title": "EIS Portfolio Statement 2025/26", "file": "eis-portfolio-statement-2025-26.txt" },
+        { "title": "Fee Agreement and Services Schedule", "file": "fee-agreement-and-services-schedule.txt" }
+      ]
+    },
+    {
+      "first_name": "Marcus",
+      "last_name": "Delacroix-Whitfield",
+      "email": "m.delacroix-whitfield@brackenridge.example",
+      "description": "Retired secondary school teacher in Bristol. Consolidating three legacy pension pots and planning drawdown income from age 63.",
+      "social_links": [],
+      "documents": [
+        { "title": "Suitability Report: Pension Consolidation", "file": "suitability-report-pension-consolidation.txt" },
+        { "title": "Electricity Account Statement, 14 Marlow Court", "file": "electricity-account-statement-marlow-court.txt" },
+        { "title": "Annual Benefit Statement, Albion Teachers' Pension Scheme", "file": "annual-benefit-statement-teachers-pension.txt" }
+      ]
+    },
+    {
+      "first_name": "Priya",
+      "last_name": "Raghunathan",
+      "email": "priya.raghunathan@northharbour.example",
+      "description": "General practitioner in Leicester with a four-property buy-to-let portfolio. Weighing incorporation against selling down leverage.",
+      "social_links": ["https://links.example/in/priya-raghunathan"],
+      "documents": [
+        { "title": "Buy-to-Let Portfolio Review", "file": "buy-to-let-portfolio-review.txt" },
+        { "title": "Assured Shorthold Tenancy Summary, 22 Rookery Lane", "file": "tenancy-agreement-summary-rookery-lane.txt" }
+      ]
+    },
+    {
+      "first_name": "Tomasz",
+      "last_name": "Wiśniewski",
+      "email": "t.wisniewski@kestrelpartners.example",
+      "description": "Polish national resident in the UK, dual tax residency. Onboarding in progress, anti-money-laundering checks partially complete.",
+      "social_links": [],
+      "documents": [
+        {
+          "title": "Onboarding Checklist: Identity and Address Verification",
+          "file": "onboarding-checklist-identity-and-address-verification.txt"
+        },
+        {
+          "title": "CRS Tax Residency Self-Certification",
+          "file": "cross-border-tax-residency-self-certification.txt"
+        }
+      ]
+    },
+    {
+      "first_name": "Amara",
+      "last_name": "Okonkwo",
+      "email": "amara.okonkwo@quaymarsh.example",
+      "description": "Founder-employee of a software company. EMI share options approaching their exit-only exercise window, life cover written in trust.",
+      "social_links": ["https://links.example/in/amara-okonkwo"],
+      "documents": [
+        { "title": "EMI Share Option Scheme Summary", "file": "share-option-scheme-summary-emi.txt" },
+        { "title": "Policy Schedule, Whole of Life Cover", "file": "policy-schedule-whole-of-life-cover.txt" }
+      ]
+    },
+    {
+      "first_name": "Henrik",
+      "last_name": "Lindqvist",
+      "email": "henrik.lindqvist@norvik.example",
+      "description": "Norwegian national living in the UK. Cross-border tax exposure, an interest-only mortgage under review, and a discretionary portfolio.",
+      "social_links": [],
+      "documents": [
+        { "title": "Mortgage Offer: Interest-Only Extension", "file": "mortgage-offer-interest-only-extension.txt" },
+        { "title": "Annual Investment Review 2025/26", "file": "annual-investment-review-2025-26.txt" }
+      ]
+    },
+    {
+      "first_name": "Béatrice",
+      "last_name": "Moreau",
+      "email": "beatrice.moreau@lavandou.example",
+      "description": "French national resident in Bristol. Disposed of a second property in Bath during the tax year and has a capital gains reporting deadline.",
+      "social_links": [],
+      "documents": [
+        {
+          "title": "Capital Gains Computation, Disposal of Second Property",
+          "file": "capital-gains-computation-second-property.txt"
+        },
+        { "title": "Bank Statement, Current Account, March", "file": "bank-statement-current-account-march.txt" }
+      ]
+    },
+    {
+      "first_name": "Samuel",
+      "last_name": "Ashworth-Bell",
+      "email": "s.ashworth-bell@wensum.example",
+      "description": "Retired educator in Norwich. Lasting power of attorney registered, cautious investor with a low capacity for loss.",
+      "social_links": [],
+      "documents": [
+        {
+          "title": "Lasting Power of Attorney: Property and Financial Affairs",
+          "file": "lasting-power-of-attorney-property-and-financial-affairs.txt"
+        },
+        { "title": "Risk Tolerance Questionnaire: Results", "file": "risk-tolerance-questionnaire-results.txt" }
+      ]
+    },
+    {
+      "first_name": "Yuki",
+      "last_name": "Tanaka",
+      "email": "yuki.tanaka@meridianbridge.example",
+      "description": "Newly appointed trustee of a family discretionary settlement. Also holds a stocks and shares ISA transferred in from another provider.",
+      "social_links": ["https://links.example/in/yuki-tanaka"],
+      "documents": [
+        {
+          "title": "Trust Deed Summary and Trustee Responsibilities",
+          "file": "trust-deed-summary-trustee-responsibilities.txt"
+        },
+        { "title": "ISA Transfer Confirmation", "file": "isa-transfer-confirmation.txt" }
+      ]
+    },
+    {
+      "first_name": "Deborah",
+      "last_name": "Feinstein",
+      "email": "d.feinstein@ravenscourt.example",
+      "description": "Grandmother of four, estate value above the taper threshold. Reviewing inheritance tax exposure, lifetime gifting and her existing will.",
+      "social_links": [],
+      "documents": [
+        {
+          "title": "Meeting Notes: Estate Planning Review, February",
+          "file": "meeting-notes-estate-planning-review-february.txt"
+        }
+      ]
+    }
+  ]
+}

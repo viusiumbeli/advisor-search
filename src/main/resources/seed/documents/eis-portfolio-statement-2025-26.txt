@@ -1,0 +1,31 @@
+ENTERPRISE INVESTMENT SCHEME PORTFOLIO STATEMENT
+
+Tax year 2025/26 (6 April 2025 to 5 April 2026)
+
+Investor: Ms Jane Roe
+Investor reference: JR-0417-EIS
+Prepared by: Aldgate Wealth Ltd, 4 Copperfield Court, Minories Walk, London EC3V 9GA
+Statement date: 14 April 2026
+Queries: eis.admin@aldgatewealth.example
+
+This statement records the Enterprise Investment Scheme subscriptions made personally by Jane Roe during the 2025/26 tax year and administered through the firm's private client records. Carrying values follow the firm's stated policy: subscription cost, adjusted only where a priced funding round or an insolvency event has occurred since the date of investment. Each company confirmed qualifying status at subscription. Income tax relief is available at 30 per cent of the amount subscribed, subject to the investor having sufficient income tax liability and holding a valid EIS3 certificate.
+
+HOLDINGS
+
+Brackenwood Biolabs Ltd (Cambridge, point-of-care diagnostics). Subscribed 12 May 2025: £25,000 for 6,250 B ordinary shares. Carrying value £25,000, held at cost. EIS3 certificate received 18 September 2025. Income tax relief of £7,500 claimed in the 2025/26 self assessment return. Three-year minimum holding period ends 12 May 2028.
+
+Cobalt Ferry Technologies Ltd (Bristol, marine logistics software). Subscribed 3 July 2025: £15,000 for 9,375 ordinary shares. Carrying value £19,500, uplifted to reflect the priced round completed on 11 February 2026 at 208 pence per share. EIS3 received 2 December 2025. Relief claimed: £4,500. Holding period ends 3 July 2028.
+
+Meridian Soil Analytics Ltd (York, agritech sensing). Subscribed 30 January 2026: £20,000 for 4,000 ordinary shares. Carrying value £20,000. EIS3 not yet issued: the company filed its compliance statement with HMRC on 19 March 2026 and expects certificates by August 2026. No relief may be claimed until the EIS3 is held; a claim of £6,000 is anticipated. Holding period ends 30 January 2029.
+
+Larkspur Cold Chain Ltd (Leeds, refrigerated distribution monitoring). Subscribed 15 October 2025: £10,000 for 2,500 ordinary shares. Carrying value £10,000. EIS3 received 20 February 2026. Relief claimed: £3,000. Holding period ends 15 October 2028.
+
+Quenby Materials Ltd (Sheffield, advanced alloys). Subscribed 9 June 2025: £12,000 for 3,000 ordinary shares. The company entered administration on 4 March 2026 and the joint administrators have indicated that no return to shareholders is expected. Carrying value written down to nil. EIS3 was received 30 October 2025 and relief of £3,600 was claimed; because the shares have not been disposed of, that relief is not withdrawn by the company's failure.
+
+LOSS RELIEF NOTE: QUENBY MATERIALS LTD
+
+A negligible value claim should be made once the administrators confirm the position, expected by autumn 2026. The allowable loss is the £12,000 subscribed less the £3,600 relief retained, namely £8,400. Under section 131 Income Tax Act 2007 this loss may be set against income of 2025/26 or 2026/27 rather than against capital gains; at the additional rate this is worth up to £3,780. We recommend claiming against 2026/27 income and will prepare the computation.
+
+SUMMARY
+
+Total subscribed in 2025/26: £82,000. Income tax relief claimed to date: £18,600. Aggregate carrying value at 5 April 2026: £74,500. Shares disposed of within their three-year period would trigger withdrawal of relief; shares held beyond it should qualify for capital gains tax exemption on disposal. This statement is a record of holdings, not tax advice or a tax return.

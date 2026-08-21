@@ -1,0 +1,56 @@
+QUAYMARK BANK
+Current Account Statement
+
+Account holder: Ms Beatrice E Moreau
+Address: 14 Greenacre Court, Bristol BS8 9ZQ
+Sort code: 60-91-44
+Account number: 00481736
+Statement number: 187
+Statement period: 1 March 2026 to 31 March 2026
+
+Opening balance on 1 March 2026: 4,182.36 in credit
+
+Transactions
+
+02 Mar  SO   HOLLOWBECK BUILDING SOCIETY MORTGAGE 44120087   1,684.22 out
+02 Mar  DD   COUNCIL TAX REF 8802941                           214.00 out
+03 Mar  DD   BRIGHTMOOR ENERGY ACC 55123098                    146.53 out
+05 Mar  CARD WESTGATE FOODHALL BRISTOL                          87.41 out
+06 Mar  DD   LOOPLINE BROADBAND                                 38.00 out
+09 Mar  CARD WESSEXLINK RAIL TICKETS BRISTOL TM                 46.80 out
+10 Mar  SO   K PAVLOVA CLEANING                                120.00 out
+11 Mar  CARD CLIFTON VILLAGE PHARMACY                           23.15 out
+12 Mar  DD   ALDERGATE HOME INSURANCE POL 7741                  31.27 out
+13 Mar  CARD OSTERIA MARINELLA BRISTOL                          94.60 out
+16 Mar  TFR  ASHCOMBE WEALTH GIA REF ASH-002233               1,000.00 out
+17 Mar  DD   RIVERSIDE HEALTH CLUB MEMBERSHIP                   52.00 out
+18 Mar  CARD WESTGATE FOODHALL BRISTOL                         112.38 out
+20 Mar  DD   ORBITEL MOBILE                                     24.99 out
+23 Mar  CARD PARAGON BOOKS BATH                                 31.50 out
+25 Mar  FPI  REFUND LANEWOOD HOMEWARE                            42.75 in
+27 Mar  BACS CULVERWELL AND PRYCE LLP SALARY                 4,918.42 in
+30 Mar  SO   QUAYMARK EASY SAVER 00481744                      500.00 out
+31 Mar  CARD MENDIP SERVICE STATION FUEL                        58.20 out
+
+Closing balance on 31 March 2026: 4,878.48 in credit
+
+Summary for the period
+
+Total payments out: 4,265.05
+Total payments in: 4,961.17
+
+Arranged overdraft limit: 1,500.00
+Your account remained in credit throughout this statement period. No arranged or unarranged overdraft interest was incurred.
+
+Interest and charges summary
+
+Credit interest earned this period (0.25 per cent AER variable, paid monthly): 0.98
+Account maintenance fee: 0.00
+Debit interest charged: 0.00
+Other service charges: 0.00
+
+Interest is calculated daily on your cleared credit balance and paid on the first working day of the following month. If you exceed your arranged overdraft limit we may decline payments, and unarranged borrowing is charged at 33.9 per cent EAR variable.
+
+If anything on this statement looks unfamiliar, contact us straight away on 0800 496 0330 or message us at help@quaymarkbank.example. Statements are available for 7 years through online banking.
+
+Quaymark Bank, registered office 1 Harbourside Exchange, Bristol BS1 9QB. Authorised and regulated in the United Kingdom. Eligible deposits are protected up to 85,000 pounds under the Financial Services Compensation Scheme.
