@@ -517,8 +517,9 @@ same reason five concurrent searches stretch search: they queue for the same cor
 maximum-size document is 1.7 s of synchronous work, which is what a caller's timeout has to be
 sized for; the criterion for moving ingest behind a background job (p99 over 5 s) is in Operating
 notes. On this 12-core machine one background ingest lifts search p95 by about a third (71 to
-93 ms); on the single-vCPU deploy the same contention would bite proportionally harder, which is
-the bounded-pool admission-control argument in the virtual-threads note.
+93 ms); on the deploy's four shared vCPUs the same contention bites harder — one ingest occupies
+a quarter of the cores rather than a twelfth — which is the bounded-pool admission-control
+argument in the virtual-threads note.
 
 **Limits.** The ceilings the system runs against, and what happens at each:
 
@@ -530,7 +531,7 @@ the bounded-pool admission-control argument in the virtual-threads note.
 | Encoder window | 256 wordpieces | Silent truncation — prevented per chunk by the chunker's hard-window fallback. |
 | Exact vector scan | ~50,000 chunks | The crossover to the HNSW index (DDL above); the large-corpus search rows show why. |
 | Synchronous ingest | 5 s p99 | Move ingest behind a background job; at the cap a document costs 1.7 s. |
-| Machine memory | 2 GB floor | JVM plus ONNX Runtime's native arenas; the 256 MB tier OOMs (`fly.toml` notes below). |
+| Machine memory | 2 GB floor | JVM plus ONNX Runtime's native arenas; 256 MB OOMs (sizing notes in Deploying it). |
 
 The 100,000-character cap itself is provenance plus headroom: the brief's clarification put the
 average document at about 10 KB, so the cap is 10× the stated corpus while staying under both
@@ -547,22 +548,86 @@ per its criterion.
 
 ## Deploying it
 
-`fly.toml` deploys the same image to Fly.io against any managed Postgres — version 18 or later,
-since the schema uses the native `uuidv7()` — that offers `pgvector` and `pg_trgm`; the migration
-creates both extensions on first start.
+The demo runs on a Hetzner Cloud VPS: the published image, a `pgvector/pgvector:pg18` container
+next to it — Postgres 18 or later, since the schema uses the native `uuidv7()`; the migration
+creates `pgvector` and `pg_trgm` on first start. Provision with the `hcloud` CLI
+(`hcloud context create`, or `HCLOUD_TOKEN` in the environment):
 
 ```bash
-fly launch --no-deploy --copy-config
-fly secrets set DB_URL=jdbc:postgresql://…  DB_USERNAME=…  DB_PASSWORD=…  API_KEY=…
-fly deploy
+ssh-keygen -t ed25519 -f ~/.ssh/advisor_hetzner -N ''
+hcloud ssh-key create --name advisor-hetzner --public-key-from-file ~/.ssh/advisor_hetzner.pub
+hcloud firewall create --name advisor-fw
+hcloud firewall add-rule advisor-fw --direction in --protocol tcp --port 22   --source-ips 0.0.0.0/0 --source-ips ::/0
+hcloud firewall add-rule advisor-fw --direction in --protocol tcp --port 8080 --source-ips 0.0.0.0/0 --source-ips ::/0
+hcloud server create --name advisor-search --type cpx32 --image ubuntu-24.04 --location hel1 \
+  --ssh-key advisor-hetzner --firewall advisor-fw
 ```
 
-Setting `API_KEY` turns on the `X-API-Key` filter, so the hosted instance needs credentials while
-the local one does not. The key is never committed; it is passed as a secret and shared separately.
+The firewall is Hetzner's, not `ufw` on the box: Docker programs its own iptables rules, which
+bypass host firewalls, so published ports must be filtered before they reach the machine. On the
+server (as root), install Docker and run the stack:
 
-Two sizing notes learned the hard way and encoded in `fly.toml`: the 256 MB free tier cannot hold
-the JVM plus ONNX Runtime's native arenas, so the machine is 2 GB; and the health check needs a
-grace period, because the first boot embeds the demo corpus before reporting ready.
+```bash
+curl -fsSL https://get.docker.com | sh
+mkdir -p /opt/advisor-search && cd /opt/advisor-search
+printf 'POSTGRES_PASSWORD=%s\nAPI_KEY=%s\n' "$(openssl rand -hex 24)" "$(openssl rand -hex 24)" > .env
+cat > docker-compose.yml <<'EOF'
+services:
+  db:
+    image: pgvector/pgvector:pg18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: advisor
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: advisor_search
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U advisor -d advisor_search"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    image: ghcr.io/viusiumbeli/advisor-search:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/advisor_search
+      DB_USERNAME: advisor
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_PROFILES_ACTIVE: seed
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+      API_KEY: ${API_KEY}
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
+EOF
+docker compose up -d
+```
+
+No registry login is needed — the image is public. Two deliberate differences from the local
+compose: the `db` service publishes no port at all, so Postgres is reachable only on the compose
+network (the local file's `5432:5432` with a known password must never face the internet), and
+`API_KEY` is always set, which turns on the `X-API-Key` filter for everything except the health
+probes and the API docs. Both secrets live only in the server-side `.env`, generated in place and
+never committed.
+
+Two sizing notes learned the hard way: 256 MB cannot hold the JVM plus ONNX Runtime's native
+arenas — the api container settles between 760 and 840 MB resident, so size for a 2 GB floor —
+and readiness needs patience on first boot, because the instance embeds the demo corpus before
+reporting ready (~1–2 minutes; poll `/actuator/health/readiness`).
+
+Teardown when the review window closes:
+
+```bash
+hcloud server delete advisor-search
+hcloud firewall delete advisor-fw && hcloud ssh-key delete advisor-hetzner
+```
 
 The image `docker compose pull` fetches is published from this repository:
 
@@ -620,10 +685,10 @@ would look like.
 - **Virtual threads.** The 2026 default for a blocking Spring MVC app — deliberately off here.
   JDK 24 removed pinning on `synchronized` (JEP 491), which killed the classic objection, but a JNI
   downcall still pins its carrier with no scheduler compensation, and this request *is* a JNI
-  downcall: ~90% of search latency is ONNX inference. On the deploy's single vCPU one in-flight
-  search would pin the only carrier and starve the readiness probe, and Tomcat's bounded pool is
-  currently the service's only admission control. The flag is one line; what it would optimize —
-  waiting — is not what this service does. The reversal trigger is stage three of the scaling
+  downcall: ~90% of search latency is ONNX inference. On the deploy's four shared vCPUs a handful
+  of in-flight searches pin every carrier — the probe-starvation risk shrinks with core count but
+  does not go away — and Tomcat's bounded pool is currently the service's only admission control.
+  The flag is one line; what it would optimize — waiting — is not what this service does. The reversal trigger is stage three of the scaling
   ladder above: embedding moves out of process, the profile inverts to I/O-bound, the property
   goes on.
 - **WebFlux / coroutines.** Same root sentence: reactive converts waiting into suspension, and
@@ -642,8 +707,8 @@ would look like.
   CRUD aggregates ever dominate. Both are additions, not rewrites.
 - **A CDS/AOT training run in the image.** Needs a live database inside `docker build` (Flyway
   migrates during context refresh), breaks the `$BUILDPLATFORM` multi-arch design by forcing the
-  training pass under QEMU, and would shave ~1 s off a 20 s number — on a platform that suspends
-  and resumes machines rather than cold-starting the JVM.
+  training pass under QEMU, and would shave ~1 s off a 20 s number — a cost paid once per deploy
+  or reboot on a VPS where the JVM otherwise just stays up.
 
 ---
 
