@@ -30,8 +30,9 @@ services:
       DB_USERNAME: advisor
       DB_PASSWORD: advisor
       # Loads the demo corpus on first start so there is something to search immediately.
-      # Seeding is idempotent, so restarts do not duplicate it.
-      SPRING_PROFILES_ACTIVE: seed
+      # Seeding is idempotent, so restarts do not duplicate it. To start empty and post your own
+      # data instead: SPRING_PROFILES_ACTIVE= docker compose up
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE-seed}
       # Empty locally, so no credentials are needed. Set it (API_KEY=... docker compose up) and
       # every endpoint except the health probes and the API documentation requires X-API-Key.
       API_KEY: ${API_KEY:-}

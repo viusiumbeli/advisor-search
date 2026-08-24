@@ -47,7 +47,9 @@ The console comes up on <http://localhost:8080/> with Swagger UI at
 `seed` profile, which loads a demo corpus of **10 clients and 20 documents** — the three longest are
 around 2,500 words each — through the ordinary `POST` endpoints, so everything you can search was
 chunked and embedded by exactly the code path a real ingest uses. Seeding is idempotent, so restarts
-do not duplicate it.
+do not duplicate it. To start empty and post your own data instead:
+`SPRING_PROFILES_ACTIVE= docker compose up` — your clients and documents go through the same
+endpoints either way.
 
 ---
 
