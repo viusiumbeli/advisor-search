@@ -1,25 +1,34 @@
 # Search design
 
-The detail behind [How search works](../README.md#how-search-works): the measurements that chose
-trigrams over full-text search for clients, both document retrievers in full, why the task's own
-second example needs more than a model, how the two rankings are fused, and how every cut-off was
-calibrated.
+The measurements behind [How search works](../README.md#how-search-works).
 
 ## Clients: trigrams, not full-text search
 
-The README shows the one-lexeme proof and the two-arm query. The rest of the argument is the
-measurement that picks `word_similarity` over `similarity`, and the objection it has to answer.
-
-The full proof test also pins the negative half — a full-text query for a fragment of the domain
-does not match the lexeme it is buried in:
+Postgres's English parser classifies an email address as a single `email` token, so a full-text
+query for a fragment of the domain cannot match inside it and the brief's first example would fail.
+`FtsEmailTokenisationProofTest` pins both halves of that:
 
 ```sql
+SELECT to_tsvector('english', 'jane.roe@aldgatewealth.example');
+-- 'jane.roe@aldgatewealth.example':1        one lexeme, not five
+
 SELECT to_tsvector('english', 'jane.roe@aldgatewealth.example')
            @@ websearch_to_tsquery('english', 'AldgateWealth');
 -- f
 ```
 
-Measured on the seeded corpus, this is why the arms are shaped that way:
+So clients are indexed with `pg_trgm` over a generated `search_text` column holding the lowercased
+name, email and description, and searched through two arms in one statement:
+
+```sql
+WHERE search_text LIKE '%' || :query || '%' ESCAPE '\'   -- exact substring
+   OR :query <% search_text                              -- word similarity, for typos
+```
+
+A single `gin_trgm_ops` index serves both, and the planner combines them with a
+[`BitmapOr`](operating-notes.md#the-client-query-uses-its-index-at-scale). The score is
+`GREATEST(substring ? 1 : 0, word_similarity(...))`, so a literal containment always scores exactly
+1.0. Measured on the seeded corpus, this is why the arms are shaped that way:
 
 | Expression | Value |
 | --- | --- |
@@ -134,7 +143,7 @@ not five), but each probe is still its own vector scan, so an expanded query tak
 against 24 ms for a plain one. That is why the expander caps a query at five probes, and why only
 queries that match a trigger pay anything at all.
 
-This is the honest version of the trade-off, and its limits are worth stating: a hand-maintained
+The limits are worth stating: a hand-maintained
 lexicon does not generalise, and it is only as good as the person editing it. In a real product this
 knowledge would come from a maintained document taxonomy, or from classifying documents by evidence
 type at ingest. What it should *not* come from is hoping a bigger model has it.
@@ -221,3 +230,24 @@ lexical match arrives at fusion as a first-place finish.
 The principled fix for the absolute floor's overlap is a cross-encoder re-ranker over the fused top
 20, which scores query and document *together* and is calibrated in a way a bi-encoder cosine is not.
 That is a real model dependency and roughly 50 ms per query, so it is named here rather than built.
+
+## Scope: what search deliberately does not do
+
+- **Generative summaries.** The summary is extractive: the passages closest to the document's own
+  centroid (`avg(embedding)` in pgvector), returned in reading order, so every sentence is verbatim
+  from the document. It needs no second model and cannot invent a fact about a client's finances.
+  A generative version is an isolated swap behind the same endpoint.
+- **Semantic search over client descriptions.** "retired educator" will not find a client described
+  as a "retired teacher", because clients are matched lexically. Descriptions are one short field
+  and the brief's client example is lexical, so this is the same chunk-and-embed pipeline pointed at
+  a second table — a named extension rather than a gap.
+- **One ranked list across clients and documents.** The scales are not comparable: a client score is
+  a trigram similarity in 0..1, a document score a fusion weight around 0.016. Hence the two blocks
+  in the [response](../README.md#api) — a decision, not an omission.
+- **Searching `social_links`.** `array_to_string` is `STABLE`, not `IMMUTABLE`, so it cannot go in
+  the generated column. The escape hatch is an `IMMUTABLE` wrapper plus
+  `ALTER TABLE … ALTER COLUMN … SET EXPRESSION AS` (PostgreSQL 17+).
+- **`unaccent`.** The corpus is English; accented names are reachable by trigram similarity. Adding
+  it means an `unaccent`-based `IMMUTABLE` wrapper in the generated column.
+- **Partial tokens inside document content.** "PLC-88" will not find `PLC-88213`; a trigram index on
+  content would fix it at the cost of a second large index.
