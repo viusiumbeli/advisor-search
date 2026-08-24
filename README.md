@@ -19,9 +19,10 @@ ONNX Runtime.
 
 ## Live demo
 
-Open <https://95.217.189.232/> — an advisor console over the whole API, with the brief's
-examples one click away. It asks once for the API key, which is in the submission email and
-deliberately not committed. The same key works against the API directly:
+Open <https://95.217.189.232/> — an advisor console over the whole API. The instance starts
+empty, so the data you post is all it holds; the seeded tour with the brief's examples is one
+`docker compose up` away locally. The console asks once for the API key, which is in the
+submission email and deliberately not committed. The same key works against the API directly:
 
 ```bash
 curl -sG https://95.217.189.232/search \

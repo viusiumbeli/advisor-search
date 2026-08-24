@@ -2,7 +2,7 @@
 # docs/operating-notes.md, "Deployment". Copied to /opt/advisor-search/docker-compose.yml rather
 # than run with `-f`, so compose auto-loads the sibling .env holding the generated secrets.
 #
-# Six deliberate differences from ../docker-compose.yml:
+# Seven deliberate differences from ../docker-compose.yml:
 #   1. Secrets from the environment, generated on the box; the dev file hardcodes `advisor`.
 #   2. API_KEY always set, so the X-API-Key filter is on. Empty locally, which disables it.
 #   3. No published Postgres port — the dev file's 5432 must never face the internet.
@@ -10,6 +10,8 @@
 #   5. ECS JSON logs, because here the reader is `docker logs`, not a person at a terminal.
 #   6. A Caddy sidecar terminates TLS on 443 (Caddyfile alongside this file) and is the only way
 #      in: api publishes no port and is reached over the compose network. Locally there is no TLS.
+#   7. No seed profile: the reviewer posts his own data, so the instance starts and stays empty.
+#      The dev compose seeds a demo corpus by default.
 #
 # No compose healthcheck on api: the image declares its own. The db one stays for depends_on.
 
@@ -39,7 +41,6 @@ services:
       DB_URL: jdbc:postgresql://db:5432/advisor_search
       DB_USERNAME: advisor
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      SPRING_PROFILES_ACTIVE: seed
       LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
       API_KEY: ${API_KEY}
 

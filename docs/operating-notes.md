@@ -180,9 +180,10 @@ rather than nginx plus a certbot cron: at that cadence, renewal has to be unatte
 battle-tested process, not a timer signalling a reload across containers.
 
 Both generated secrets live only in `/opt/advisor-search/.env` on the server; `cat` it to read the
-API key back. No registry login is needed, because the image is public. First boot needs patience:
-the instance embeds the demo corpus before reporting ready (~1–2 minutes; poll
-`/actuator/health/readiness`). Teardown when the review window closes:
+API key back. No registry login is needed, because the image is public. The deployed instance runs
+without the seed profile, so it starts empty and reports ready in seconds; a seeded instance embeds
+the demo corpus first and takes ~1–2 minutes (poll `/actuator/health/readiness`). Teardown when the
+review window closes:
 
 ```bash
 hcloud server delete advisor-search
