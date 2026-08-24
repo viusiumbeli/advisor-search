@@ -1,0 +1,18 @@
+# TLS for the demo instance. The site address is the bare IP: Let's Encrypt issues IP-address
+# certificates under its short-lived profile (~6-day lifetime), which the global block opts into —
+# without it Caddy would fall back to its internal self-signed CA for an IP site. Caddy renews at
+# two-thirds of lifetime, so roughly every four days, in-process and unattended; that renewal
+# cadence is why the proxy is Caddy rather than nginx plus a certbot cron.
+{
+	email iusiumbeli.vlad@gmail.com
+	cert_issuer acme {
+		profile shortlived
+	}
+	# Clients cannot put an IP literal in SNI (RFC 6066), so every connection to the bare IP
+	# arrives SNI-less; this maps those connections onto the IP certificate.
+	default_sni 95.217.189.232
+}
+
+95.217.189.232 {
+	reverse_proxy api:8080
+}

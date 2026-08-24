@@ -19,16 +19,18 @@ ONNX Runtime.
 
 ## Live demo
 
-Open <http://95.217.189.232:8080/> — an advisor console over the whole API, with the brief's
+Open <https://95.217.189.232/> — an advisor console over the whole API, with the brief's
 examples one click away. It asks once for the API key, which is in the submission email and
 deliberately not committed. The same key works against the API directly:
 
 ```bash
-curl -sG http://95.217.189.232:8080/search \
+curl -sG https://95.217.189.232/search \
   -H "X-API-Key: $KEY" --data-urlencode 'q=AldgateWealth'
 ```
 
-Swagger UI at <http://95.217.189.232:8080/swagger-ui.html> and the health probes need no key.
+Swagger UI at <https://95.217.189.232/swagger-ui.html> and the health probes need no key. A Caddy
+sidecar terminates TLS with a short-lived Let's Encrypt IP certificate; the service speaks plain
+HTTP behind it.
 
 ---
 

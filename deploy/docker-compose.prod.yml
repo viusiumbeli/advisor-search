@@ -2,12 +2,14 @@
 # docs/operating-notes.md, "Deployment". Copied to /opt/advisor-search/docker-compose.yml rather
 # than run with `-f`, so compose auto-loads the sibling .env holding the generated secrets.
 #
-# Five deliberate differences from ../docker-compose.yml:
+# Six deliberate differences from ../docker-compose.yml:
 #   1. Secrets from the environment, generated on the box; the dev file hardcodes `advisor`.
 #   2. API_KEY always set, so the X-API-Key filter is on. Empty locally, which disables it.
 #   3. No published Postgres port — the dev file's 5432 must never face the internet.
 #   4. restart: unless-stopped, so the stack survives a reboot.
 #   5. ECS JSON logs, because here the reader is `docker logs`, not a person at a terminal.
+#   6. A Caddy sidecar terminates TLS on 443 (Caddyfile alongside this file) and is the only way
+#      in: api publishes no port and is reached over the compose network. Locally there is no TLS.
 #
 # No compose healthcheck on api: the image declares its own. The db one stays for depends_on.
 
@@ -40,8 +42,21 @@ services:
       SPRING_PROFILES_ACTIVE: seed
       LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
       API_KEY: ${API_KEY}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
     ports:
-      - "8080:8080"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates live here. The short-lived IP certs last ~6 days, so losing this volume on
+      # every recreate would re-issue constantly and eat the CA's rate limit.
+      - caddy_data:/data
 
 volumes:
   pgdata:
+  caddy_data:

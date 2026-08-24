@@ -145,8 +145,9 @@ with the `hcloud` CLI (`hcloud context create`, or `HCLOUD_TOKEN` in the environ
 ssh-keygen -t ed25519 -f ~/.ssh/advisor_hetzner -N ''
 hcloud ssh-key create --name advisor-hetzner --public-key-from-file ~/.ssh/advisor_hetzner.pub
 hcloud firewall create --name advisor-fw
-hcloud firewall add-rule advisor-fw --direction in --protocol tcp --port 22   --source-ips 0.0.0.0/0 --source-ips ::/0
-hcloud firewall add-rule advisor-fw --direction in --protocol tcp --port 8080 --source-ips 0.0.0.0/0 --source-ips ::/0
+hcloud firewall add-rule advisor-fw --direction in --protocol tcp --port 22  --source-ips 0.0.0.0/0 --source-ips ::/0
+hcloud firewall add-rule advisor-fw --direction in --protocol tcp --port 80  --source-ips 0.0.0.0/0 --source-ips ::/0
+hcloud firewall add-rule advisor-fw --direction in --protocol tcp --port 443 --source-ips 0.0.0.0/0 --source-ips ::/0
 hcloud server create --name advisor-search --type cpx32 --image ubuntu-24.04 --location hel1 \
   --ssh-key advisor-hetzner --firewall advisor-fw
 ```
@@ -162,14 +163,21 @@ printf 'POSTGRES_PASSWORD=%s\nAPI_KEY=%s\n' "$(openssl rand -hex 24)" "$(openssl
   > /opt/advisor-search/.env
 ```
 
-Then, from a checkout of this repository, copy up the production compose file and start the stack.
-[`deploy/docker-compose.prod.yml`](../deploy/docker-compose.prod.yml) is the local compose with five
-deliberate differences, listed and justified in its header:
+Then, from a checkout of this repository, copy up the production compose file and the Caddyfile and
+start the stack. [`deploy/docker-compose.prod.yml`](../deploy/docker-compose.prod.yml) is the local
+compose with six deliberate differences, listed and justified in its header:
 
 ```bash
 scp deploy/docker-compose.prod.yml root@<ip>:/opt/advisor-search/docker-compose.yml
+scp deploy/Caddyfile root@<ip>:/opt/advisor-search/Caddyfile
 ssh root@<ip> 'cd /opt/advisor-search && docker compose up -d'
 ```
+
+TLS lives in a Caddy sidecar, not in Spring: the certificate lifecycle stays out of the JVM and
+costs no code. The certificate is a Let's Encrypt IP-address certificate — short-lived by design
+(~6 days, renewed in-process at two-thirds of lifetime) — which is also why the proxy is Caddy
+rather than nginx plus a certbot cron: at that cadence, renewal has to be unattended and in one
+battle-tested process, not a timer signalling a reload across containers.
 
 Both generated secrets live only in `/opt/advisor-search/.env` on the server; `cat` it to read the
 API key back. No registry login is needed, because the image is public. First boot needs patience:
