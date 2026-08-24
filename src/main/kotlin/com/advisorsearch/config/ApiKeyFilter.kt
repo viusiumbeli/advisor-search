@@ -17,9 +17,12 @@ private val log = LoggerFactory.getLogger(ApiKeyFilter::class.java)
 
 private const val HEADER = "X-API-Key"
 
-/** Health probes stay open for the orchestrator; the API documentation for the reviewer. */
+/**
+ * Health probes stay open for the orchestrator, the API documentation and the console page for the
+ * reviewer. The page itself holds no data — everything it fetches still goes through this filter.
+ */
 private val PUBLIC_PREFIXES = listOf("/actuator/", "/swagger-ui/", "/v3/api-docs")
-private val PUBLIC_PATHS = listOf("/swagger-ui.html")
+private val PUBLIC_PATHS = listOf("/swagger-ui.html", "/", "/index.html")
 
 /**
  * Shared-secret header check for the deployed instance. An empty `api.key` — the compose default —

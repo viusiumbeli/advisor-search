@@ -105,9 +105,10 @@ API.
 
 ## Authentication
 
-Setting `API_KEY` turns on an `X-API-Key` filter on every endpoint except the health probes and the
-API documentation. Unset — the compose default — the filter does nothing, so running the project
-locally needs no credentials. This is a shared secret for a demo API, not a user identity system;
+Setting `API_KEY` turns on an `X-API-Key` filter on every endpoint except the health probes, the
+API documentation, and the console page at `/` — the page itself holds no data; everything it
+fetches still goes through the filter. Unset — the compose default — the filter does nothing, so
+running the project locally needs no credentials. This is a shared secret for a demo API, not a user identity system;
 real multi-tenancy would scope every query by the authenticated advisor's organisation, which is a
 `WHERE` clause through `client_id` rather than a new subsystem.
 

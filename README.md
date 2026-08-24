@@ -19,15 +19,16 @@ ONNX Runtime.
 
 ## Live demo
 
-A deployed instance is available for review at `http://95.217.189.232:8080`:
+Open <http://95.217.189.232:8080/> — an advisor console over the whole API, with the brief's
+examples one click away. It asks once for the API key, which is in the submission email and
+deliberately not committed. The same key works against the API directly:
 
 ```bash
 curl -sG http://95.217.189.232:8080/search \
   -H "X-API-Key: $KEY" --data-urlencode 'q=AldgateWealth'
 ```
 
-The key is in the submission email; it is deliberately not committed. Swagger UI at
-<http://95.217.189.232:8080/swagger-ui.html> and the health probes need no key.
+Swagger UI at <http://95.217.189.232:8080/swagger-ui.html> and the health probes need no key.
 
 ---
 
@@ -39,7 +40,7 @@ docker compose up          # ~20s from clean to healthy; builds the image first 
 ./demo.sh                  # a guided tour of every endpoint (needs jq)
 ```
 
-The API comes up on <http://localhost:8080> with Swagger UI at
+The console comes up on <http://localhost:8080/> with Swagger UI at
 <http://localhost:8080/swagger-ui.html>, and needs no credentials locally. It starts under the
 `seed` profile, which loads a demo corpus of **10 clients and 20 documents** — the three longest are
 around 2,500 words each — through the ordinary `POST` endpoints, so everything you can search was
@@ -102,7 +103,8 @@ into that list was the hardest part of the task, written up in
 | `GET` | `/search?q=&limit=` | The search. `q` is required and must be non-blank; `limit` defaults to 10 and is clamped to 50. |
 | `GET` | `/actuator/health` | Liveness and readiness. Readiness waits for the embedding model. |
 
-Live OpenAPI at `/swagger-ui.html`. Field names follow the task's fragment (`first_name`,
+Live OpenAPI at `/swagger-ui.html`; the console at `/` drives every endpoint from a browser.
+Field names follow the task's fragment (`first_name`,
 `client_id`, `created_at`), so the whole API speaks snake_case. Errors are RFC 9457
 `application/problem+json`, and validation failures carry an extra `errors` object keyed by field,
 because "400 Bad Request" alone does not tell a caller which of five fields it got wrong.

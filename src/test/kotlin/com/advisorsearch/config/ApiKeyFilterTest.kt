@@ -48,4 +48,19 @@ class ApiKeyFilterTest(
         mockMvc.get("/actuator/health").andExpect { status { isOk() } }
         mockMvc.get("/v3/api-docs").andExpect { status { isOk() } }
     }
+
+    @Test
+    fun `the console page stays open but the API it calls does not`() {
+        // A browser cannot attach X-API-Key to a plain navigation, so the page itself must load
+        // without one; the data it fetches is still keyed, as the 401 tests above prove.
+        // MockMvc reports the welcome page as the forward it is rather than following it.
+        mockMvc.get("/").andExpect {
+            status { isOk() }
+            forwardedUrl("index.html")
+        }
+        mockMvc.get("/index.html").andExpect {
+            status { isOk() }
+            content { contentTypeCompatibleWith(MediaType.TEXT_HTML) }
+        }
+    }
 }

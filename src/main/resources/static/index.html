@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Advisor Search</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='14' cy='14' r='9' fill='none' stroke='%232e6df6' stroke-width='4'/%3E%3Cline x1='21' y1='21' x2='29' y2='29' stroke='%232e6df6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #fafafa; --panel: #ffffff; --ink: #1b1e24; --muted: #676d78;
+    --line: #e3e5e9; --accent: #2e6df6; --accent-ink: #ffffff;
+    --keyword: #8a5a00; --keyword-bg: #fdf3dd; --semantic: #175e63; --semantic-bg: #e2f3f4;
+    --both: #4c3f9e; --both-bg: #ebe8fa; --ok: #1d8348; --err: #b03a2e; --err-bg: #fdedec;
+    --mark: #fff1b8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121418; --panel: #1a1d23; --ink: #e8eaed; --muted: #9aa1ab;
+      --line: #2a2e36; --accent: #5a8bff; --accent-ink: #0d1117;
+      --keyword: #e8bb6a; --keyword-bg: #3a2f16; --semantic: #7fd0d6; --semantic-bg: #14383b;
+      --both: #b3a7f0; --both-bg: #2b2650; --ok: #58c98a; --err: #ef8a80; --err-bg: #3d1f1c;
+      --mark: #5a4a12;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  main { max-width: 880px; margin: 0 auto; padding: 0 20px 64px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  button { font: inherit; cursor: pointer; }
+
+  header {
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+    padding: 28px 0 6px;
+  }
+  .wordmark { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+  .wordmark span { color: var(--accent); }
+  .tagline { color: var(--muted); font-size: 14px; }
+  .header-links { margin-left: auto; display: flex; gap: 16px; align-items: baseline; font-size: 14px; }
+  #key-state { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  #key-state::before { content: "●"; margin-right: 5px; color: var(--ok); }
+  #key-state.locked::before { color: var(--err); }
+
+  .search-row { display: flex; gap: 10px; margin: 18px 0 8px; }
+  #q {
+    flex: 1; min-width: 0; padding: 13px 16px; font-size: 17px; color: var(--ink);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; outline: none;
+  }
+  #q:focus { border-color: var(--accent); }
+  #limit {
+    width: 76px; padding: 0 10px; font: inherit; color: var(--ink);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  }
+  .go {
+    padding: 0 22px; border: none; border-radius: 10px; font-weight: 600;
+    background: var(--accent); color: var(--accent-ink);
+  }
+  .go:disabled { opacity: 0.6; cursor: default; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+  .chips-label { flex-basis: 100%; font-size: 13px; color: var(--muted); }
+  .chip {
+    padding: 7px 14px; font-size: 14px; color: var(--ink);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  .note { font-size: 14px; color: var(--muted); margin: 10px 2px; }
+  .note.error { color: var(--err); background: var(--err-bg); border-radius: 8px; padding: 10px 14px; }
+
+  .block-title {
+    margin: 26px 2px 10px; font-size: 13px; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px; margin-bottom: 10px;
+  }
+  .card-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .card-title { font-weight: 600; font-size: 16.5px; }
+  .score { margin-left: auto; font-variant-numeric: tabular-nums; font-size: 13.5px; color: var(--muted); white-space: nowrap; }
+  .badge {
+    font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    padding: 2.5px 9px; border-radius: 999px; white-space: nowrap;
+  }
+  .badge.keyword { color: var(--keyword); background: var(--keyword-bg); }
+  .badge.semantic { color: var(--semantic); background: var(--semantic-bg); }
+  .badge.both { color: var(--both); background: var(--both-bg); }
+  .badge.client { color: var(--accent); background: var(--both-bg); }
+  .card .meta { font-size: 14px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+  .card .body { margin-top: 8px; font-size: 15px; overflow-wrap: anywhere; }
+  mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+  .expand {
+    margin-top: 10px; padding: 0; border: none; background: none;
+    color: var(--accent); font-size: 14px; font-weight: 600;
+  }
+  .detail { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .detail h4 { margin: 10px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .passage { display: flex; gap: 12px; align-items: stretch; margin-bottom: 10px; }
+  .passage .bar-track { flex: 0 0 4px; background: var(--line); border-radius: 2px; position: relative; }
+  .passage .bar { position: absolute; bottom: 0; left: 0; right: 0; background: var(--accent); border-radius: 2px; }
+  .passage .text { font-size: 14.5px; }
+  .passage .centrality { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .fulltext {
+    white-space: pre-wrap; font-size: 14px; max-height: 320px; overflow: auto;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px;
+  }
+
+  details.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-top: 14px; }
+  details.panel > summary {
+    cursor: pointer; padding: 14px 18px; font-weight: 600; list-style: none; display: flex; align-items: center;
+  }
+  details.panel > summary::after { content: "+"; margin-left: auto; color: var(--muted); font-size: 18px; }
+  details.panel[open] > summary::after { content: "–"; }
+  .panel-body { padding: 0 18px 18px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 4px; }
+  .field input, .field textarea, .field select {
+    width: 100%; padding: 9px 12px; font: inherit; font-size: 15px; color: var(--ink);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  }
+  .field textarea { min-height: 110px; resize: vertical; }
+  .field .err-msg { display: none; font-size: 13px; color: var(--err); margin-top: 3px; }
+  .field.invalid input, .field.invalid textarea { border-color: var(--err); }
+  .field.invalid .err-msg { display: block; }
+  .form-note { font-size: 14px; margin-top: 10px; }
+  .form-note.ok { color: var(--ok); }
+  .form-note.bad { color: var(--err); }
+
+  dialog {
+    border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink);
+    padding: 24px; max-width: 380px; width: calc(100vw - 48px);
+  }
+  dialog::backdrop { background: rgba(0,0,0,0.45); }
+  dialog h3 { margin: 0 0 6px; }
+  dialog p { margin: 0 0 14px; font-size: 14px; color: var(--muted); }
+
+  footer { margin-top: 46px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--muted); }
+  @media (max-width: 560px) {
+    .search-row { flex-wrap: wrap; }
+    #q { flex-basis: 100%; }
+    .header-links { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="wordmark">Advisor<span>Search</span></div>
+    <div class="tagline">clients and documents, found by text or by meaning</div>
+    <nav class="header-links">
+      <a href="/swagger-ui.html">API docs</a>
+      <a href="https://github.com/viusiumbeli/advisor-search">Source</a>
+      <span id="key-state">checking…</span>
+    </nav>
+  </header>
+
+  <div class="search-row">
+    <input id="q" type="search" placeholder="Search clients and documents — try “address proof”"
+           autocomplete="off" autofocus>
+    <select id="limit" title="Results per block">
+      <option>5</option><option selected>10</option><option>25</option><option>50</option>
+    </select>
+    <button class="go" id="go">Search</button>
+  </div>
+
+  <div class="chips" id="chips">
+    <span class="chips-label">From the brief, one click each:</span>
+    <button class="chip" data-q="AldgateWealth">AldgateWealth — email fragment finds the client</button>
+    <button class="chip" data-q="address proof">address proof — finds the electricity bill</button>
+    <button class="chip" data-q="PLC-88213">PLC-88213 — exact token, keyword arm</button>
+    <button class="chip" data-q="Delacroix-Whitfeld">Delacroix-Whitfeld — misspelled surname</button>
+    <button class="chip" data-q="photosynthesis in tropical rainforest canopies">no plausible answer → empty, not noise</button>
+  </div>
+
+  <div id="status"></div>
+  <div id="results"></div>
+
+  <details class="panel" id="new-client-panel">
+    <summary>New client</summary>
+    <div class="panel-body">
+      <form id="client-form" novalidate>
+        <div class="field" data-f="first_name"><label>First name</label><input name="first_name"><div class="err-msg"></div></div>
+        <div class="field" data-f="last_name"><label>Last name</label><input name="last_name"><div class="err-msg"></div></div>
+        <div class="field" data-f="email"><label>Email</label><input name="email" type="email"><div class="err-msg"></div></div>
+        <div class="field" data-f="description"><label>Description <span style="font-weight:400;color:var(--muted)">(optional)</span></label><textarea name="description"></textarea><div class="err-msg"></div></div>
+        <button class="go" type="submit">Create client</button>
+        <div class="form-note" id="client-form-note"></div>
+      </form>
+    </div>
+  </details>
+
+  <details class="panel" id="new-document-panel">
+    <summary>New document</summary>
+    <div class="panel-body">
+      <form id="document-form" novalidate>
+        <div class="field" data-f="client"><label>Client email</label><input name="client" placeholder="jane.roe@aldgatewealth.example"><div class="err-msg"></div></div>
+        <div class="field" data-f="title"><label>Title</label><input name="title"><div class="err-msg"></div></div>
+        <div class="field" data-f="content"><label>Content</label><textarea name="content"></textarea><div class="err-msg"></div></div>
+        <button class="go" type="submit">Create document</button>
+        <div class="form-note" id="document-form-note"></div>
+      </form>
+      <p class="note">The 201 means chunked, embedded and searchable — try finding it straight away.</p>
+    </div>
+  </details>
+
+  <footer>
+    Postgres trigrams find clients; full-text search and MiniLM embeddings each rank documents, and
+    reciprocal rank fusion combines the two. Design notes in the
+    <a href="https://github.com/viusiumbeli/advisor-search#readme">README</a>.
+  </footer>
+</main>
+
+<dialog id="key-dialog">
+  <h3>API key</h3>
+  <p>This instance requires an <code>X-API-Key</code> header. The key is in the submission email.
+     It is kept only in this tab.</p>
+  <form method="dialog" id="key-form">
+    <div class="field"><input id="key-input" type="password" placeholder="API key" autocomplete="off"></div>
+    <button class="go" type="submit">Use key</button>
+  </form>
+</dialog>
+
+<script>
+"use strict";
+const $ = (sel) => document.querySelector(sel);
+const results = $("#results"), status_ = $("#status"), keyState = $("#key-state");
+const keyDialog = $("#key-dialog");
+let keyRequired = false;
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// Highlights each query term inside already-escaped text.
+function highlight(text, query) {
+  let out = esc(text);
+  const terms = [...new Set(query.toLowerCase().split(/\s+/).filter((t) => t.length >= 3))];
+  for (const term of terms) {
+    out = out.replace(new RegExp("(" + term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "gi"), "<mark>$1</mark>");
+  }
+  return out;
+}
+
+function getKey() { try { return sessionStorage.getItem("apiKey") || ""; } catch { return ""; } }
+function setKey(value) { try { value ? sessionStorage.setItem("apiKey", value) : sessionStorage.removeItem("apiKey"); } catch {} }
+
+function updateKeyState() {
+  if (!keyRequired) { keyState.textContent = "no key needed"; keyState.classList.remove("locked"); }
+  else if (getKey()) { keyState.textContent = "key set"; keyState.classList.remove("locked"); }
+  else { keyState.textContent = "key required"; keyState.classList.add("locked"); }
+}
+
+// One fetch for every API call: attaches the key, and turns a 401 into a re-prompt.
+async function api(path, options = {}) {
+  const headers = Object.assign({}, options.headers);
+  if (getKey()) headers["X-API-Key"] = getKey();
+  const response = await fetch(path, Object.assign({}, options, { headers }));
+  if (response.status === 401) {
+    keyRequired = true;
+    setKey("");
+    updateKeyState();
+    keyDialog.showModal();
+    throw new Error("unauthorized");
+  }
+  return response;
+}
+
+async function problemMessage(response) {
+  try { const p = await response.json(); return p.detail || p.title || response.statusText; }
+  catch { return response.statusText; }
+}
+
+// --- search ------------------------------------------------------------------------------------
+
+function clientCard(hit) {
+  const c = hit.client;
+  const links = (c.social_links || []).map((l) => `<a href="${esc(l)}" rel="noopener">${esc(l)}</a>`).join(" · ");
+  return `<div class="card">
+    <div class="card-head">
+      <span class="card-title">${esc(c.first_name)} ${esc(c.last_name)}</span>
+      <span class="badge client">${esc(hit.matched_on)}</span>
+      <span class="score">score ${hit.score.toFixed(4)}</span>
+    </div>
+    <div class="meta">${esc(c.email)}</div>
+    ${c.description ? `<div class="body">${esc(c.description)}</div>` : ""}
+    ${links ? `<div class="meta" style="margin-top:6px">${links}</div>` : ""}
+  </div>`;
+}
+
+function documentCard(hit, query) {
+  const d = hit.document;
+  return `<div class="card" data-id="${esc(d.id)}">
+    <div class="card-head">
+      <span class="card-title">${esc(d.title)}</span>
+      <span class="badge ${esc(hit.matched_on)}">${esc(hit.matched_on)}</span>
+      <span class="score">score ${hit.score.toFixed(4)}</span>
+    </div>
+    <div class="body">${highlight(hit.snippet, query)}</div>
+    <button class="expand" data-id="${esc(d.id)}">Show document and summary</button>
+    <div class="detail" hidden></div>
+  </div>`;
+}
+
+async function runSearch(query) {
+  query = query.trim();
+  if (!query) return;
+  $("#q").value = query;
+  $("#go").disabled = true;
+  status_.innerHTML = `<p class="note">Searching…</p>`;
+  results.innerHTML = "";
+  try {
+    const response = await api(`/search?q=${encodeURIComponent(query)}&limit=${$("#limit").value}`);
+    if (!response.ok) { status_.innerHTML = `<p class="note error">${esc(await problemMessage(response))}</p>`; return; }
+    const hits = await response.json();
+    const clients = hits.filter((h) => h.type === "client");
+    const documents = hits.filter((h) => h.type === "document");
+    if (!hits.length) {
+      status_.innerHTML = `<p class="note">Nothing matched “${esc(query)}”. Queries the corpus cannot
+        answer return an empty array rather than a page of weakly-related noise.</p>`;
+      return;
+    }
+    status_.innerHTML = "";
+    let html = "";
+    if (clients.length) html += `<div class="block-title">Clients</div>` + clients.map(clientCard).join("");
+    if (documents.length) html += `<div class="block-title">Documents</div>` + documents.map((h) => documentCard(h, query)).join("");
+    results.innerHTML = html;
+  } catch (e) {
+    if (e.message !== "unauthorized") status_.innerHTML = `<p class="note error">Request failed: ${esc(e.message)}</p>`;
+  } finally {
+    $("#go").disabled = false;
+  }
+}
+
+async function expandDocument(button) {
+  const detail = button.nextElementSibling;
+  if (!detail.hidden) { detail.hidden = true; button.textContent = "Show document and summary"; return; }
+  button.textContent = "Loading…";
+  try {
+    const [docResponse, summaryResponse] = await Promise.all([
+      api(`/documents/${button.dataset.id}`),
+      api(`/documents/${button.dataset.id}/summary`),
+    ]);
+    if (!docResponse.ok || !summaryResponse.ok) {
+      detail.innerHTML = `<p class="note error">${esc(await problemMessage(docResponse.ok ? summaryResponse : docResponse))}</p>`;
+    } else {
+      const doc = await docResponse.json();
+      const summary = await summaryResponse.json();
+      const maxCentrality = Math.max(...summary.passages.map((p) => p.centrality), 0.0001);
+      detail.innerHTML = `
+        <h4>Summary — ${esc(summary.method)}, ${summary.chunk_count} chunks</h4>
+        ${summary.passages.map((p) => `
+          <div class="passage">
+            <div class="bar-track"><div class="bar" style="height:${Math.round((p.centrality / maxCentrality) * 100)}%"></div></div>
+            <div><div class="text">${esc(p.text)}</div>
+                 <div class="centrality">chunk ${p.chunk_index} · centrality ${p.centrality.toFixed(3)}</div></div>
+          </div>`).join("")}
+        <h4>Full content — ${esc(doc.title)}</h4>
+        <div class="fulltext">${esc(doc.content)}</div>`;
+    }
+    detail.hidden = false;
+    button.textContent = "Hide";
+  } catch (e) {
+    if (e.message !== "unauthorized") { detail.innerHTML = `<p class="note error">${esc(e.message)}</p>`; detail.hidden = false; }
+    button.textContent = "Show document and summary";
+  }
+}
+
+// --- forms -------------------------------------------------------------------------------------
+
+function clearFieldErrors(form) {
+  form.querySelectorAll(".field").forEach((f) => f.classList.remove("invalid"));
+}
+
+function showFieldErrors(form, errors) {
+  for (const [field, messages] of Object.entries(errors || {})) {
+    // The errors map is keyed by the server-side property name (camelCase), the form by the wire
+    // name (snake_case); normalise so the message lands on its field.
+    const wireName = field.replace(/[A-Z]/g, (c) => "_" + c.toLowerCase());
+    const wrap = form.querySelector(`.field[data-f="${wireName}"]`);
+    if (wrap) { wrap.classList.add("invalid"); wrap.querySelector(".err-msg").textContent = [].concat(messages).join("; "); }
+  }
+}
+
+async function submitJson(form, note, path, body) {
+  clearFieldErrors(form);
+  note.className = "form-note";
+  note.textContent = "…";
+  try {
+    const response = await api(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (response.ok) return await response.json();
+    const problem = await response.json().catch(() => ({}));
+    if (problem.errors) showFieldErrors(form, problem.errors);
+    note.className = "form-note bad";
+    note.textContent = problem.detail || problem.title || `Failed (${response.status})`;
+  } catch (e) {
+    if (e.message !== "unauthorized") { note.className = "form-note bad"; note.textContent = e.message; }
+  }
+  return null;
+}
+
+$("#client-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.target, note = $("#client-form-note");
+  const created = await submitJson(form, note, "/clients", {
+    first_name: form.first_name.value || null,
+    last_name: form.last_name.value || null,
+    email: form.email.value || null,
+    description: form.description.value || null,
+  });
+  if (created) {
+    note.className = "form-note ok";
+    note.textContent = `Created ${created.first_name} ${created.last_name} — searchable now.`;
+    form.reset();
+  }
+});
+
+$("#document-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.target, note = $("#document-form-note");
+  clearFieldErrors(form);
+  // The API is addressed by client id; the form asks for the email and resolves it via search.
+  const email = form.client.value.trim();
+  let found = [];
+  try {
+    const response = await api(`/search?q=${encodeURIComponent(email)}&limit=1`);
+    if (response.ok) found = await response.json();
+  } catch (e) {
+    if (e.message !== "unauthorized") { note.className = "form-note bad"; note.textContent = e.message; }
+    return;
+  }
+  const client = found.find((h) => h.type === "client" && h.client.email.toLowerCase() === email.toLowerCase());
+  if (!client) {
+    showFieldErrors(form, { client: ["no client with this email"] });
+    note.className = "form-note bad";
+    note.textContent = "Client not found.";
+    return;
+  }
+  const created = await submitJson(form, note, `/clients/${client.client.id}/documents`, {
+    title: form.title.value || null,
+    content: form.content.value || null,
+  });
+  if (created) {
+    note.className = "form-note ok";
+    note.textContent = `Created “${created.title}” — chunked, embedded and searchable now.`;
+    form.reset();
+  }
+});
+
+// --- wiring ------------------------------------------------------------------------------------
+
+$("#go").addEventListener("click", () => runSearch($("#q").value));
+$("#q").addEventListener("keydown", (event) => { if (event.key === "Enter") runSearch($("#q").value); });
+$("#chips").addEventListener("click", (event) => {
+  const chip = event.target.closest(".chip");
+  if (chip) runSearch(chip.dataset.q);
+});
+results.addEventListener("click", (event) => {
+  const button = event.target.closest(".expand");
+  if (button) expandDocument(button);
+});
+$("#key-form").addEventListener("submit", () => {
+  setKey($("#key-input").value.trim());
+  $("#key-input").value = "";
+  updateKeyState();
+});
+
+// On load: one cheap probe decides whether this instance wants a key.
+(async () => {
+  try {
+    const response = await fetch("/search?q=ping&limit=1", getKey() ? { headers: { "X-API-Key": getKey() } } : {});
+    keyRequired = response.status === 401;
+    if (keyRequired && !getKey()) keyDialog.showModal();
+  } catch { /* offline; searching will surface the error */ }
+  updateKeyState();
+})();
+</script>
+</body>
+</html>
