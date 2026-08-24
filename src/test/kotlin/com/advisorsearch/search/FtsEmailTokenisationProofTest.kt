@@ -8,12 +8,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * The executable version of the argument for using trigrams on clients rather than full-text search.
- *
- * The task's own example is that a fragment of an email domain must find its client. Postgres's
- * English parser classifies an email address as one `email` token and emits it as a single lexeme,
- * so no full-text query for a fragment of the domain can match it. This test pins that behaviour
- * rather than leaving it as a claim in the README.
+ * The executable version of the argument for trigrams over full-text search: Postgres classifies an
+ * email address as one `email` token and emits it as a single lexeme, so no full-text query for a
+ * fragment of the domain can match it — and the task's first example would fail.
  */
 class FtsEmailTokenisationProofTest(
     private val jdbc: JdbcClient,

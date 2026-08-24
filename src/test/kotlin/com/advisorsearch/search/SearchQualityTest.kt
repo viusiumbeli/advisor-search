@@ -9,11 +9,8 @@ import kotlin.test.assertTrue
 
 /**
  * The evaluation harness. Every query in golden-queries.json must return its expected result inside
- * the top five, and the mean reciprocal rank is printed so a change that keeps every query passing
- * while pushing results down the list is still visible.
- *
- * This is what stops a relevance change from being judged by whether one hand-run example still
- * looks right.
+ * the top five, and mean reciprocal rank is printed so results sliding down the list stay visible
+ * even while every query still passes.
  */
 class SearchQualityTest(
     private val service: SearchService,

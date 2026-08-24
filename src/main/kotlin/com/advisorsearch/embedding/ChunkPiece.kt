@@ -1,10 +1,6 @@
 package com.advisorsearch.embedding
 
-/**
- * One indivisible span of text plus the whitespace that preceded it, so a rendered chunk reproduces
- * the document exactly. An implementation detail of [Chunker] — `internal` only because a top-level
- * `private` would be invisible to the chunker's own file.
- */
+/** A span of text plus the whitespace before it, so a rendered chunk reproduces the document exactly. */
 internal data class ChunkPiece(
     val text: String,
     val separator: String,

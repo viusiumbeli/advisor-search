@@ -5,10 +5,8 @@ import org.springframework.stereotype.Service
 import java.util.UUID
 
 /**
- * Thin by design: client creation has no business logic today, and this layer exists for the
- * boundary, not the behaviour. It keeps every controller on the same controller→service→repository
- * path and gives other features (document ingest, seeding) a client API that is not another
- * feature's repository.
+ * Thin by design: the layer exists for the boundary, not the behaviour, so document ingest and
+ * seeding have a client API to call rather than another feature's repository.
  */
 @Service
 class ClientService(

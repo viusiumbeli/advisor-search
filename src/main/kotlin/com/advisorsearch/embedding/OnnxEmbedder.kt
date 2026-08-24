@@ -14,12 +14,9 @@ private val log = LoggerFactory.getLogger(OnnxEmbedder::class.java)
 const val EMBEDDING_DIMENSIONS = 384
 
 /**
- * all-MiniLM-L6-v2 running in-process on ONNX Runtime.
- *
- * The published sentence-transformers pipeline for this checkpoint is transformer -> mean pooling
- * -> L2 normalisation, and all three steps are reproduced here. Normalising is what makes the
- * stored vectors unit length, so cosine distance is the only metric the numbers support and
- * `1 - (a <=> b)` in Postgres is directly the cosine similarity.
+ * all-MiniLM-L6-v2 in-process on ONNX Runtime, reproducing the checkpoint's published pipeline:
+ * transformer, mean pooling, L2 normalisation. Normalising is what makes the stored vectors unit
+ * length, so `1 - (a <=> b)` in Postgres is directly the cosine similarity.
  */
 class OnnxEmbedder(
     modelPath: Path,

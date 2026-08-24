@@ -6,7 +6,6 @@ data class GoldenSet(
     val clients: List<GoldenQuery>,
 )
 
-/** One evaluation case: the query, the single result that must come back, and why it is interesting. */
 data class GoldenQuery(
     val query: String,
     val expect: String,

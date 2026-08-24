@@ -10,15 +10,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 /**
- * The schema is the backstop for any writer that is not the API — a migration, a bulk import, an
- * ad-hoc psql session. These tests bypass the API on purpose and prove the database itself rejects
- * what the DTO validation would have rejected, so the invariants hold even for code that has never
- * heard of `@Size`.
+ * Bypasses the API on purpose to prove the database rejects what DTO validation would have, so the
+ * invariants hold for a migration or an ad-hoc psql session too.
  *
- * Transactional so every probe row rolls back: the suite shares one database, and a leftover
- * client whose profile happens to contain a search test's substring would change that test's
- * results. That is not hypothetical — the original non-transactional version displaced a
- * two-character-query result with its own residue.
+ * Transactional so every probe row rolls back — the suite shares one database, and the original
+ * non-transactional version displaced a two-character-query result with its own residue.
  */
 @Transactional
 class SchemaConstraintTest(

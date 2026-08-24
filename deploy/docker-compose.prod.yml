@@ -1,23 +1,15 @@
-# The production stack: the published image plus its database, as deployed on the Hetzner VPS.
-# See "Deploying it" in ../README.md for the provisioning and copy-up steps.
+# The production stack, as deployed on the Hetzner VPS. Provisioning steps are in
+# docs/operating-notes.md, "Deployment". Copied to /opt/advisor-search/docker-compose.yml rather
+# than run with `-f`, so compose auto-loads the sibling .env holding the generated secrets.
 #
-# It is scp'd to /opt/advisor-search/docker-compose.yml on the server rather than run with `-f`,
-# so compose auto-loads the sibling .env that holds the generated secrets.
+# Five deliberate differences from ../docker-compose.yml:
+#   1. Secrets from the environment, generated on the box; the dev file hardcodes `advisor`.
+#   2. API_KEY always set, so the X-API-Key filter is on. Empty locally, which disables it.
+#   3. No published Postgres port — the dev file's 5432 must never face the internet.
+#   4. restart: unless-stopped, so the stack survives a reboot.
+#   5. ECS JSON logs, because here the reader is `docker logs`, not a person at a terminal.
 #
-# Five deliberate differences from the dev ../docker-compose.yml:
-#
-#   1. Secrets come from the environment. POSTGRES_PASSWORD and API_KEY are generated on the box
-#      into .env; the dev file hardcodes `advisor` because it never faces the internet.
-#   2. API_KEY is always set, so the X-API-Key filter is on for every endpoint except the health
-#      probes and the API documentation. Locally it defaults to empty, which turns the filter off.
-#   3. The db service publishes no port. The dev file's `5432:5432` with a known password must
-#      never face the internet, and nothing outside the compose network needs Postgres.
-#   4. `restart: unless-stopped` on both services, so the stack survives a reboot of the VPS.
-#   5. Structured console logs (ECS JSON) instead of human-readable ones, because on a server the
-#      reader is `docker logs` piped into something, not a person watching a terminal.
-#
-# The api service carries no compose healthcheck: the image declares its own HEALTHCHECK, so
-# `docker ps` reports health either way. The db healthcheck stays because `depends_on` needs it.
+# No compose healthcheck on api: the image declares its own. The db one stays for depends_on.
 
 services:
   db:

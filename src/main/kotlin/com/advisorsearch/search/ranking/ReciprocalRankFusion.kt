@@ -3,16 +3,9 @@ package com.advisorsearch.search.ranking
 import java.util.UUID
 
 /**
- * Reciprocal rank fusion (Cormack, Clarke and Buettcher, SIGIR 2009), the default hybrid combiner
- * in Elasticsearch, OpenSearch and Azure AI Search.
- *
- * It combines rankings rather than scores, which is the point: `ts_rank_cd` and cosine similarity
- * are on unrelated scales, and no fixed weighting between them survives a change of corpus. A
- * document ranked by both retrievers outscores one ranked highly by a single retriever, so
- * agreement between keyword and semantic evidence is what wins.
- *
- * Relevance cut-offs must be applied to the input lists, not here: once a score has become a rank,
- * "not similar enough" is no longer expressible.
+ * Reciprocal rank fusion (Cormack, Clarke and Buettcher, SIGIR 2009). Combines rankings, not scores,
+ * so callers must apply relevance cut-offs to the input lists — a rank cannot express "not similar
+ * enough". Why this and not a weighted blend: docs/search-design.md, "Fusion".
  */
 object ReciprocalRankFusion {
     fun fuse(
@@ -31,7 +24,7 @@ object ReciprocalRankFusion {
             }
         }
 
-        // Ties are broken by id so that two runs over the same data return the same order.
+        // Id breaks ties only so repeated runs agree; callers re-sort on their own keys.
         return scores.entries
             .map { (id, score) -> FusedDocument(id, score, sources.getValue(id)) }
             .sortedWith(compareByDescending<FusedDocument> { it.score }.thenBy { it.id })

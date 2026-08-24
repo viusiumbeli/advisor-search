@@ -48,26 +48,17 @@ embedding:
 search:
   default-limit: 10
   max-limit: 50
-  # Cosine floor applied to chunk hits before fusion. Ranks cannot express a relevance cut-off, so
-  # the threshold has to be applied while the scores still exist.
+  # The three floors below are measured, not picked. How, and on what:
+  # docs/search-design.md, "Calibrating the cut-offs".
   #
-  # Deliberately coarse. Measured on this corpus, genuinely relevant documents score between 0.33
-  # and 0.79 while irrelevant ones reach 0.38, so the two ranges overlap and no threshold separates
-  # them. 0.30 is set to reject queries with no answer at all (nonsense scores at most 0.21) rather
-  # than to judge relevance, which the relative floor below and fusion do instead.
+  # Absolute cosine floor. Answers "can the corpus answer this at all?" — nonsense peaks at 0.21 —
+  # rather than judging relevance, which the relative floor and fusion do instead.
   semantic-floor: 0.30
-
-  # The second half of the semantic cut-off, and the one that decides how long a result page is.
-  # The absolute floor answers "is there any answer at all"; this answers "how many of these are as
-  # good as the best one". Measured on this corpus, the document a query is really about is the top
-  # semantic hit for 15 of the 18 evaluation queries, and never scores below 0.76 of the best hit,
-  # so 0.70 keeps every one of them and discards the long tail of loosely-related documents.
+  # Relative cosine floor, and the one that decides how long a result page is. True positives never
+  # score below 0.76 of the query's best hit, so 0.70 keeps them all and drops the long tail.
   semantic-floor-ratio: 0.70
-
-  # Lexical floor, expressed relative to the best ts_rank_cd for the same query rather than as an
-  # absolute number, because ts_rank_cd has no meaningful absolute scale. Measured on this corpus,
-  # genuine secondary matches score 0.50 to 0.58 of the best hit while incidental ones — a document
-  # that happens to contain "burden of proof" — score 0.03 and below. 0.05 sits in that gap.
+  # Lexical floor, relative because ts_rank_cd has no absolute scale. Genuine secondary matches
+  # score 0.50 to 0.58 of the best hit, incidental ones 0.03 and below; 0.05 sits in that gap.
   keyword-floor-ratio: 0.05
 
   # pg_trgm's `<%` operator threshold, set per search transaction.

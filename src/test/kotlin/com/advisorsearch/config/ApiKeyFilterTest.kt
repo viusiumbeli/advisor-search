@@ -8,9 +8,8 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 
 /**
- * The deployed instance runs with a key set; docker compose does not. This pins both halves of that
- * switch, including which paths stay open so a reviewer can still read the documentation and the
- * orchestrator can still probe health.
+ * The deployed instance runs with a key set, docker compose does not. Pins both halves of that
+ * switch, including which paths stay open.
  */
 @TestPropertySource(properties = ["api.key=test-secret-key"])
 class ApiKeyFilterTest(

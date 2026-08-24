@@ -11,9 +11,7 @@ import kotlin.time.measureTimedValue
 
 private val log = LoggerFactory.getLogger(StartupChecks::class.java)
 
-/**
- * Two things are verified before the instance is allowed to report itself ready.
- */
+/** Two things are verified before the instance reports itself ready. */
 @Component
 @Order(0)
 class StartupChecks(
@@ -26,9 +24,8 @@ class StartupChecks(
     }
 
     /**
-     * Vectors from two different models share a column but not a space, and comparing them produces
-     * confident nonsense rather than an error. Recording the model per chunk is only useful if
-     * something checks it, so a mismatch stops the instance instead of silently degrading search.
+     * Vectors from two models share a column but not a space, and comparing them yields confident
+     * nonsense rather than an error — so a mismatch stops the instance instead of degrading search.
      */
     private fun assertCorpusMatchesModel() {
         val foreign = documents.distinctEmbeddingModels().filter { it != embeddings.modelId }
@@ -40,9 +37,8 @@ class StartupChecks(
     }
 
     /**
-     * First inference allocates the ONNX arenas and pages in the native libraries. Doing it here
-     * means the first user request is not the one that pays for it, and a model that cannot run
-     * fails startup rather than the first search.
+     * First inference allocates the ONNX arenas and pages in the native libraries. Paying that here
+     * means no user request does, and a model that cannot run fails startup rather than a search.
      */
     private fun warmUp() {
         val (vector, elapsed) = measureTimedValue { embeddings.embedQuery("warm up the embedding model") }

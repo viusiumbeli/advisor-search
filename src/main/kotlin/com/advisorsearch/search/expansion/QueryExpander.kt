@@ -13,19 +13,11 @@ private const val LEXICON = "search/query-expansions.json"
 private const val MAX_PROBES = 5
 
 /**
- * Supplies the one thing a general-purpose embedding model does not know: which documents serve
- * which purpose in this domain.
- *
- * The task's own example — "address proof" should find a utility bill — is not a similarity
- * relationship. It is procedural knowledge. Five embedding models were measured on this corpus and
- * every one of them ranked the utility bill 13th or worse for that query, while ranking probes like
- * "retirement income planning" or "share options vesting" first. Adding a bigger model does not
- * close that gap, so the knowledge is stated here instead, in a file a domain expert can edit
- * without touching Kotlin.
- *
- * Expansion widens the semantic arm only. The lexical arm's value is precision on exact tokens, and
- * OR-ing extra phrases into it would buy recall the semantic arm already delivers, at the cost of
- * matching every document that merely mentions a bank statement.
+ * Supplies what a general-purpose embedding model does not know: which documents serve which purpose
+ * in this domain. "Address proof finds a utility bill" is procedural knowledge, not similarity, so it
+ * lives in a JSON lexicon a domain expert can edit without touching Kotlin. Expansion widens the
+ * semantic arm only. The five-model measurement behind this is in docs/search-design.md, "Why the
+ * task's own example needs more than a model".
  */
 @Component
 class QueryExpander(
@@ -42,9 +34,9 @@ class QueryExpander(
     }
 
     /**
-     * Returns the probes to run the semantic arm with: always the user's own query first, then the
-     * expansions of any concept it mentions. A query that matches nothing is returned unchanged, so
-     * the common case costs one string comparison per rule and nothing else.
+     * The probes to run the semantic arm with: the user's own query first, then the expansions of any
+     * concept it mentions. A query matching nothing is returned unchanged, so the common case costs
+     * one string comparison per rule.
      */
     fun expand(query: String): List<String> {
         val normalised = normalise(query)

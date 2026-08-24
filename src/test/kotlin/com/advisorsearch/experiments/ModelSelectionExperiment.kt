@@ -14,9 +14,8 @@ import kotlin.io.path.listDirectoryEntries
 import kotlin.math.sqrt
 
 /**
- * The experiment behind the decision to add a query expansion lexicon rather than reach for a bigger
- * embedding model. It ranks every seeded document against a set of probe queries, once per candidate
- * model, using each model's own documented pooling and query prefix.
+ * The experiment behind choosing a query expansion lexicon over a bigger embedding model: it ranks
+ * every seeded document against a set of probes, once per candidate model.
  *
  * It is not part of the suite's guarantees and passes as a no-op unless the candidate models are
  * downloaded, because they are 100 MB each and only needed to reproduce the measurement:

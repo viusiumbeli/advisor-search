@@ -10,17 +10,13 @@ private const val ESTIMATED_CHARS_PER_TOKEN = 4
 private const val MAX_CHARS_PER_TOKEN = 12
 
 /**
- * Splits document text into overlapping pieces that fit the encoder's window.
+ * Splits document text into overlapping pieces that fit the encoder's window: paragraph boundaries,
+ * then sentence, then a hard window. The last one matters — without it an unbroken block longer than
+ * the window reaches the encoder and is silently truncated.
  *
- * Boundaries are tried in order of how much meaning they preserve: paragraph, then sentence, then a
- * hard window as a last resort. The fallback is the important one. Without it a single unbroken
- * block longer than the window would be handed to the encoder and silently truncated, which is the
- * exact failure this design exists to avoid.
- *
- * Size is measured with the real tokenizer rather than by character count, because the budget that
- * matters is wordpieces. A character ceiling is applied as well: WordPiece maps any run longer than
- * a hundred characters to a single unknown token, so a wall of characters can satisfy a
- * token-only budget while still being a useless chunk to store or show as a snippet.
+ * Sizes are measured with the real tokenizer, plus a character ceiling: WordPiece maps any run over
+ * a hundred characters to one unknown token, so a wall of text can satisfy a token-only budget while
+ * being a useless chunk to store or show.
  */
 class Chunker(
     private val tokenizer: WordPieceTokenizer,
@@ -89,11 +85,9 @@ class Chunker(
         }
 
     /**
-     * Splits into pieces while remembering the exact whitespace that separated them.
-     *
-     * Keeping the original separator rather than a canonical one means a rendered chunk is a true
-     * substring of the document, so a snippet quotes the source exactly instead of a
-     * whitespace-normalised approximation of it.
+     * Splits into pieces, remembering the exact whitespace that separated them: keeping the original
+     * separator makes a rendered chunk a true substring of the document, so a snippet quotes the
+     * source exactly rather than a whitespace-normalised approximation.
      */
     private fun split(content: String): List<ChunkPiece> {
         val pieces = mutableListOf<ChunkPiece>()
@@ -128,7 +122,6 @@ class Chunker(
         return pieces
     }
 
-    /** Walks [text] as segments delimited by [boundary], handing each segment the separator that follows it. */
     private inline fun forEachSegment(
         text: String,
         boundary: Regex,
@@ -143,10 +136,9 @@ class Chunker(
     }
 
     /**
-     * Last resort for text with no usable boundary: a wall of words with no punctuation, a long
-     * table row, an unbroken identifier. Cuts on whitespace where one is available and verifies each
-     * piece against the tokenizer, shrinking until it genuinely fits rather than trusting a
-     * characters-per-token estimate.
+     * Last resort for text with no usable boundary — a wall of words, a long table row, an unbroken
+     * identifier. Cuts on whitespace where there is one and verifies each piece against the
+     * tokenizer, shrinking until it fits rather than trusting a characters-per-token estimate.
      */
     private fun hardSplit(text: String): List<ChunkPiece> {
         val pieces = mutableListOf<ChunkPiece>()

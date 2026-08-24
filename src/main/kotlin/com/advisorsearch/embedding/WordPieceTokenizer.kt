@@ -4,11 +4,9 @@ import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer
 import java.nio.file.Path
 
 /**
- * The single tokenizer used for both indexing and querying.
- *
- * Two underlying instances are kept on purpose. The encoding one truncates at [maxTokens] because
- * that is what the model can consume; the counting one never truncates, because a counter that
- * saturates at the limit could not tell the chunker that a piece of text is too long.
+ * The single tokenizer used for both indexing and querying, over two underlying instances: the
+ * encoding one truncates at [maxTokens] because that is what the model consumes, the counting one
+ * never does, because a counter saturating at the limit could not tell the chunker text is too long.
  */
 class WordPieceTokenizer(
     tokenizerPath: Path,

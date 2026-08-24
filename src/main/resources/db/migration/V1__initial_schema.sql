@@ -4,15 +4,10 @@
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- Field bounds are enforced twice on purpose. The API is the first validator and returns per-field
--- 400s; these varchar limits and CHECK constraints are the backstop for any writer that is not the
--- API — a migration, a bulk import, an ad-hoc psql session. The limits equal the API's @Size
--- bounds. (The API's are counted in UTF-16 units and Postgres counts code points, so API-valid
--- input always fits here; the API is strictly the tighter gate.)
---
--- Ids are UUIDv7 (native in Postgres 18): the leading 48 bits are a unix-ms timestamp, so ids are
--- time-ordered and primary-key inserts stay append-mostly instead of scattering across the B-tree
--- the way fully random v4 ids do.
+-- Field bounds are enforced twice: the API validates first and returns per-field 400s, these
+-- constraints back it up for any writer that is not the API. The limits equal the API's @Size
+-- bounds, and the API is strictly the tighter gate — it counts UTF-16 units where Postgres counts
+-- code points, so API-valid input always fits here.
 
 CREATE TABLE clients (
     id           uuid PRIMARY KEY DEFAULT uuidv7(),
@@ -21,8 +16,8 @@ CREATE TABLE clients (
     -- 320 = 64 (local part) + 1 + 255 (domain), the classic upper bound for an email address.
     email        varchar(320) NOT NULL,
     description  varchar(5000),
-    -- The per-element bound (500 chars) stays API-only: an element typmod would not survive
-    -- array functions, and nothing searches or indexes this column.
+    -- The per-element bound (500 chars) stays API-only: an element typmod would not survive array
+    -- functions, and nothing searches or indexes this column.
     social_links text[] NOT NULL DEFAULT '{}',
     created_at   timestamptz NOT NULL DEFAULT now(),
     -- One lowercased haystack per client so a single trigram index covers name, email and
@@ -49,9 +44,8 @@ CREATE TABLE documents (
     id         uuid PRIMARY KEY DEFAULT uuidv7(),
     client_id  uuid NOT NULL REFERENCES clients (id) ON DELETE CASCADE,
     title      varchar(500) NOT NULL,
-    -- content stays text with a CHECK rather than varchar(100000): the cap mirrors the
-    -- configurable ingest.max-content-length, and a business rule frozen into a column type
-    -- cannot be commented or found by name. The configured value must never exceed this ceiling.
+    -- text with a CHECK, not varchar(100000): the cap mirrors the configurable
+    -- ingest.max-content-length, which must never exceed this ceiling.
     content    text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     -- The two-argument to_tsvector is IMMUTABLE and therefore legal in a generated column; the
@@ -72,8 +66,7 @@ CREATE TABLE document_chunks (
     id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     document_id     uuid NOT NULL REFERENCES documents (id) ON DELETE CASCADE,
     chunk_index     int NOT NULL,
-    -- Produced by the chunker, whose own token and character budgets bound it; no user reaches
-    -- this table directly, so it carries no varchar/CHECK of its own.
+    -- Bounded by the chunker's own token and character budgets; no user writes here directly.
     content         text NOT NULL,
     embedding       vector(384) NOT NULL,
     -- Which model produced this row. Checked at startup so a model swap fails loudly instead of

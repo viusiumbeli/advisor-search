@@ -35,12 +35,10 @@ class EmbeddingService(
     fun embedQueries(queries: List<String>): List<FloatArray> = embedder.embedAll(queries)
 
     /**
-     * Embeds a document's chunks in one batched call.
-     *
-     * Each chunk is embedded with its document title prepended. A chunk pulled from the middle of a
-     * long document often has no idea what it is about ("the amount due is payable within 14 days");
-     * the title carries that context into the vector at no storage cost, because only the raw chunk
-     * text is persisted.
+     * Embeds a document's chunks in one batched call, each with the document title prepended. A chunk
+     * from the middle of a long document often has no idea what it is about ("the amount due is
+     * payable within 14 days"); the title carries that into the vector at no storage cost, because
+     * only the raw chunk text is persisted.
      */
     fun embedChunks(
         title: String,

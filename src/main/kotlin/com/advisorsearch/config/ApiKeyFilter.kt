@@ -22,15 +22,9 @@ private val PUBLIC_PREFIXES = listOf("/actuator/", "/swagger-ui/", "/v3/api-docs
 private val PUBLIC_PATHS = listOf("/swagger-ui.html")
 
 /**
- * Shared-secret header check for the deployed instance.
- *
- * When `api.key` is empty — the docker compose default — the filter does nothing, so running the
- * project locally needs no credentials. The hosted instance sets API_KEY and then every endpoint
- * except the health probes and the API documentation requires the header.
- *
- * This is deliberately not a user identity system: the task asks for credentials to a demo API, and
- * a shared key is the honest amount of authentication for that. Real multi-tenancy would scope
- * every query by an authenticated advisor's organisation.
+ * Shared-secret header check for the deployed instance. An empty `api.key` — the compose default —
+ * disables it, so running locally needs no credentials. A shared key, not a user identity system;
+ * see docs/operating-notes.md, "Authentication".
  */
 @Component
 class ApiKeyFilter(

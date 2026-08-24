@@ -7,13 +7,11 @@ import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * Builds the one client search statement from its two variable parts. Only compile-time constants
- * are ever interpolated here; user input reaches the statement exclusively through the named
- * parameters.
+ * Builds the one client search statement from its two variable parts. Only compile-time constants are
+ * interpolated; user input reaches the statement exclusively through named parameters.
  *
- * `matched_on` names a field only when the query literally occurs in it. A fuzzy hit has no single
- * responsible field — the similarity is computed over the whole profile — so it reports `profile`
- * rather than inventing an attribution.
+ * `matched_on` names a field only when the query literally occurs in it — a fuzzy hit is scored over
+ * the whole profile, so no single field is responsible and it reports `profile`.
  */
 private fun clientSearchSql(
     score: String,
@@ -44,21 +42,17 @@ private val SUBSTRING_AND_FUZZY =
     )
 
 /**
- * Clients are found with trigrams, not full-text search.
- *
- * Postgres tokenises `jane.roe@aldgatewealth.example` into a single `email` lexeme, so a full-text
- * query for "AldgateWealth" can never match inside it — the task's own example would fail. Trigrams
- * index three-character shingles of the whole profile, so a substring of an email, a misspelled
- * surname and a word from a description are all reachable through one index.
+ * Trigrams rather than full-text search: Postgres tokenises an email address into a single `email`
+ * lexeme, so no full-text query for a fragment of the domain can match inside it.
+ * `FtsEmailTokenisationProofTest` pins that.
  */
 @Repository
 class ClientSearchRepository(
     private val jdbc: JdbcClient,
 ) {
     /**
-     * Runs both arms in one statement. `LIKE '%q%'` is the exact-substring arm that guarantees a
-     * literal match scores 1.0; `<%` is pg_trgm's word-similarity arm that tolerates typos. A single
-     * `gin_trgm_ops` index serves both, and the planner combines them with a BitmapOr.
+     * Both arms in one statement: `LIKE '%q%'` guarantees a literal match scores 1.0, and `<%` is
+     * pg_trgm's word-similarity arm for typos. One `gin_trgm_ops` index serves both.
      */
     @Transactional(readOnly = true)
     fun search(

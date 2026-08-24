@@ -12,9 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.context.request.WebRequest
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler
 
-/**
- * The two cases the framework cannot render well on its own.
- */
+/** The two cases the framework cannot render well on its own. */
 @RestControllerAdvice
 class ApiExceptionHandler : ResponseEntityExceptionHandler() {
     /**

@@ -12,12 +12,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 
 /**
- * Postgres for the integration tests, wired in by Spring Boot's service connection support so no
- * datasource properties have to be set by hand.
- *
- * Nearly every test class shares this exact configuration, so Spring caches one application context
- * and reuses one container across them. Only a class that changes properties — the API key test —
- * gets its own.
+ * Postgres for the integration tests, wired in by service connection support so no datasource
+ * properties are set by hand. Nearly every class shares this configuration, so Spring caches one
+ * context and reuses one container; only a class that changes properties gets its own.
  */
 @TestConfiguration(proxyBeanMethods = false)
 class TestDatabase {

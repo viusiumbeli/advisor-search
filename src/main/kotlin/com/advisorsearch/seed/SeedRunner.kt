@@ -7,9 +7,8 @@ import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
 
 /**
- * Active only under the `seed` profile, which docker compose turns on so that `docker compose up`
- * gives a reviewer a corpus to search immediately. Ordered after the startup checks so the model is
- * already verified before anything is embedded.
+ * Active only under the `seed` profile, which docker compose turns on. Ordered after the startup
+ * checks so the model is verified before anything is embedded.
  */
 @Component
 @Profile("seed")

@@ -169,9 +169,9 @@ Two consequences that shaped the code:
 
 Exact ties are common — two documents that place equally in different lists score identically — and
 are broken by evidence first (a lexical hit is a fact, a semantic hit is an estimate), then by
-title. Neither falls back to the primary key: ids are random per install, and an id tie-break makes
-results reorder between one deployment and the next. That was a real bug, caught by running the
-evaluation twice.
+title, and only then by the primary key, which is there to make the order stable rather than to mean
+anything. Ranking *on* the id was the bug: deployments do not share ids, so results reordered
+between one install and the next. It was caught by running the evaluation twice.
 
 ## Evaluation
 

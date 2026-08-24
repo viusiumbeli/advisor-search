@@ -57,8 +57,8 @@ class SearchService(
         query: String,
         limit: Int,
     ): List<ClientHit> {
-        // Trigram similarity over one or two characters is noise, so short queries keep only the
-        // exact-substring arm rather than returning an arbitrary slice of the client list.
+        // Trigram similarity over one or two characters is noise, so short queries keep the
+        // substring arm only.
         val fuzzy = query.count(Char::isLetterOrDigit) >= properties.minFuzzyQueryLength
         return clients
             .search(query.lowercase(), limit, fuzzy, properties.wordSimilarityThreshold)
@@ -66,14 +66,9 @@ class SearchService(
     }
 
     /**
-     * The lexical arm, with a relevance floor expressed relative to the best hit for this query.
-     *
-     * `ts_rank_cd` has no absolute scale, so an absolute threshold would mean different things for
-     * different queries, but within one query the numbers are comparable. On this corpus a genuine
-     * secondary match scores about half the best hit while an incidental one — a document that
-     * happens to contain the words "burden of proof" — scores under a twentieth of it. Without the
-     * floor those incidental hits reach fusion and outrank real answers, because reciprocal rank
-     * fusion sees their position in the list and not how weak they were.
+     * The lexical arm, floored relative to this query's best hit rather than absolutely: `ts_rank_cd`
+     * has no scale that carries between queries. Calibrated in docs/search-design.md, "Calibrating
+     * the cut-offs".
      */
     private fun findLexically(query: String): List<DocumentMatch> {
         val matches = documents.keywordSearch(query, properties.candidateDocuments)
@@ -83,10 +78,8 @@ class SearchService(
 
     /**
      * Runs the semantic arm once per probe and keeps each document's best result across all of them.
-     *
-     * Taking the maximum rather than blending the probes into one vector matters: averaging "address
-     * proof" with "utility bill" produces a vector that is a weaker match for both than either is on
-     * its own, whereas the maximum lets whichever phrasing actually describes the document win.
+     * The maximum, not a blend: averaging "address proof" with "utility bill" gives a vector that
+     * matches both worse than either does alone.
      */
     private fun findSemantically(query: String): List<DocumentMatch> {
         // All probes are embedded in one padded batch — one forward pass, not one per probe.
@@ -96,13 +89,8 @@ class SearchService(
                 .flatMap { vector -> documents.semanticSearch(vector, properties.candidateChunks) }
                 .bestByDocument()
 
-        // Both floors are applied here, while the numbers are still cosine similarities. After
-        // fusion there are only ranks, and "not similar enough" cannot be expressed as a rank.
-        //
-        // The absolute floor decides whether the corpus can answer the query at all. The relative
-        // one decides how many results are worth showing: cosine has no calibrated scale across
-        // queries, but within one query the scores are comparable, so a document scoring well below
-        // this query's best match is a loosely-related document rather than an answer.
+        // Both floors apply here, while the numbers are still cosine similarities: after fusion
+        // there are only ranks, and "not similar enough" cannot be expressed as a rank.
         val ceiling = best.firstOrNull()?.score ?: 0.0
         val floor = maxOf(properties.semanticFloor, ceiling * properties.semanticFloorRatio)
         return best.filter { it.score >= floor }
@@ -124,11 +112,12 @@ class SearchService(
             )
 
         // Exact ties are common: two documents that placed equally in different lists score
-        // identically. They are broken by evidence first — a lexical hit is a fact, the token is in
-        // the document, while a semantic hit is an estimate — and then by title. Neither falls back
-        // to the primary key, because ids are random per install and would reorder results between
-        // one deployment and the next. Sorting happens on the full-precision score; rounding is
-        // presentation and would otherwise manufacture additional ties.
+        // identically. Evidence breaks them first — a lexical hit is a fact, the token is in the
+        // document, while a semantic hit is an estimate — then title, and only then id, which is
+        // there to make the order stable rather than to mean anything. Deployments do not share
+        // ids, so anything that reordered on id would rank differently from one install to the
+        // next. Sorting uses the full-precision score; rounding is presentation and would
+        // otherwise manufacture extra ties.
         val headlines = keyword.associate { it.reference.id to it.snippet }
         return fused
             .map { item ->

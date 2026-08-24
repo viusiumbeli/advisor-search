@@ -19,14 +19,9 @@ private const val CORPUS = "seed/corpus.json"
 private const val DOCUMENTS = "seed/documents"
 
 /**
- * Loads the demo corpus so that a freshly started instance has something to search.
- *
- * It goes through the ordinary service layer rather than inserting rows directly, so the seeded
- * documents are chunked and embedded by exactly the code path a real POST uses. A fixture built
- * with a shortcut would be the wrong thing to demonstrate and the wrong thing to test against.
- *
- * Seeding is idempotent by client email and document title, so restarting a container with a
- * persistent volume does not duplicate the corpus.
+ * Loads the demo corpus through the ordinary service layer rather than inserting rows, so seeded
+ * documents are chunked and embedded by exactly the code path a real POST uses. Idempotent by client
+ * email and document title, so restarting a container with a volume does not duplicate the corpus.
  */
 @Service
 class SeedService(

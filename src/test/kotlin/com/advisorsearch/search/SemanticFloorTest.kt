@@ -8,13 +8,10 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertTrue
 
 /**
- * Guards `search.semantic-floor` from both sides, and prints the evidence for how it was chosen.
- *
- * The floor exists to stop a query with no answer from returning a page of vaguely-scored
- * documents. It cannot also serve as a relevance judgement: measured here, genuinely relevant
- * documents score from about 0.33 upwards while irrelevant ones reach about 0.38, so the two ranges
- * overlap and no single threshold separates them. The two assertions below are the properties the
- * floor can actually hold to.
+ * Guards `search.semantic-floor` from both sides and prints the evidence behind it. The floor stops a
+ * query with no answer returning a page of vague scores; it cannot also judge relevance, because the
+ * true- and false-positive ranges overlap. Full numbers in docs/search-design.md, "Calibrating the
+ * cut-offs".
  */
 class SemanticFloorTest(
     private val documents: DocumentSearchRepository,
@@ -53,9 +50,8 @@ class SemanticFloorTest(
         )
 
     /**
-     * Proper nouns and reference codes. The lexical arm answers these; the semantic arm has
-     * nothing useful to add and its best guess sits inside the true-positive range, which is
-     * why the floor is not a relevance judgement. Reported, not asserted.
+     * Proper nouns and reference codes: the lexical arm answers these, and the semantic arm's best
+     * guess lands inside the true-positive range. Reported, not asserted.
      */
     private val lexical = listOf("AldgateWealth", "raghunathan", "PLC-88213")
 

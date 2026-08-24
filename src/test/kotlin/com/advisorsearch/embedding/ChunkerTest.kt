@@ -5,10 +5,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * The chunker is measured with the real tokenizer, because a budget checked with a different
- * tokenizer than the encoder uses is not a budget.
- */
+/** Measured with the real tokenizer: a budget checked with a different one is not a budget. */
 class ChunkerTest {
     private val tokenizer = TestModel.tokenizer
     private val chunker = Chunker(tokenizer, budgetTokens = 200, overlapTokens = 30)

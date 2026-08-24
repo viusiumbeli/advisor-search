@@ -12,10 +12,8 @@ class DocumentRepository(
     private val jdbc: JdbcClient,
 ) {
     /**
-     * Writes the document and all of its chunks in one transaction, so a document is never
-     * searchable in the keyword index while its vectors are missing. Embedding happens before this
-     * call: holding a transaction open across model inference would pin a connection for the whole
-     * inference time for no benefit.
+     * Document and chunks in one transaction, so a document is never in the keyword index while its
+     * vectors are missing. Embedding happens before the call, to keep a connection off inference.
      */
     @Transactional
     fun insertWithChunks(
@@ -72,10 +70,8 @@ class DocumentRepository(
             .getOrNull()
 
     /**
-     * Picks the passages closest to the document's own centroid.
-     *
-     * `avg(embedding)` is pgvector's mean over the chunk vectors, so the centroid never leaves the
-     * database and no vectors have to be parsed back into the JVM.
+     * Picks the passages closest to the document's own centroid. `avg(embedding)` is pgvector's mean,
+     * so the centroid never leaves the database and no vectors are parsed back into the JVM.
      */
     fun centralChunks(
         documentId: UUID,

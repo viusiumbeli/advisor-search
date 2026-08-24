@@ -16,10 +16,9 @@ data class Client(
 )
 
 /**
- * The wire shape. Required fields are nullable on purpose: with non-null Kotlin types an absent
- * field dies inside Jackson as an unreadable-body 400 with no field map, whereas nullable fields
- * reach Bean Validation, which reports every violation per field. The nullability stops here —
- * [toNewClient] resolves it exactly once, after validation has run.
+ * Wire shape. Required fields are nullable on purpose: with non-null Kotlin types an absent field
+ * dies inside Jackson as an unreadable-body 400 with no field map, whereas nullable fields reach
+ * Bean Validation, which reports every violation per field. [toNewClient] resolves it exactly once.
  */
 data class CreateClientRequest(
     @field:NotBlank(message = "must not be blank")
@@ -41,7 +40,6 @@ data class CreateClientRequest(
     > = emptyList(),
 )
 
-/** A validated, normalised client: what the rest of the application works with. */
 data class NewClient(
     val firstName: String,
     val lastName: String,

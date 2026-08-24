@@ -1,11 +1,9 @@
-# The build stage downloads the embedding model once and the runtime stage carries it in the image.
-# Nothing is fetched at container start: ONNX Runtime and the tokenizer both ship their native
-# libraries inside their jars, so a running container needs no network beyond Postgres.
+# The model is baked in at build time; nothing is fetched at container start, because ONNX Runtime
+# and the tokenizer ship their native libraries inside their jars.
 #
-# The build stage is pinned to the builder's own architecture. Its outputs — a jar and the model
-# files — are architecture independent, so there is nothing to gain from emulating a foreign
-# architecture through QEMU to produce them, and a multi-architecture build would otherwise spend
-# minutes doing exactly that.
+# The build stage is pinned to the builder's own architecture: its outputs are architecture
+# independent, so emulating a foreign one through QEMU to produce them would cost minutes and buy
+# nothing.
 FROM --platform=$BUILDPLATFORM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace
 
@@ -19,8 +17,7 @@ RUN ./gradlew --no-daemon provisionModel
 COPY src src
 RUN ./gradlew --no-daemon bootJar -x test
 
-# Splitting the fat jar into Boot's layers keeps the ~110 MB of dependencies in their own image
-# layer: a source change re-pushes only the ~1 MB application layer, not the whole jar.
+# Boot's layers keep the ~110 MB of dependencies separate, so a source change re-pushes ~1 MB.
 RUN java -Djarmode=tools -jar build/libs/advisor-search-*.jar extract --layers --launcher --destination extracted
 
 FROM eclipse-temurin:25-jre AS runtime
@@ -42,16 +39,14 @@ COPY --from=build /workspace/models models
 USER advisor
 EXPOSE 8080
 
-# Self-describing image: `docker run` gets the same health semantics compose declares.
-# (No --start-interval here: it needs Docker Engine 25+ and is a hard parse error on 24, unlike
-# the compose field of the same name, which older engines simply ignore.)
+# So `docker run` gets the same health semantics compose declares. No --start-interval: it needs
+# Docker Engine 25+ and is a hard parse error on 24, unlike the compose field of the same name.
 HEALTHCHECK --interval=5s --timeout=5s --retries=12 --start-period=30s \
     CMD curl -fsS http://localhost:8080/actuator/health/readiness || exit 1
 
-# Flags live in the ENTRYPOINT rather than JAVA_TOOL_OPTIONS: the env var is inherited by every JVM
-# in the container and echoes itself to stderr on each start. MaxRAMPercentage leaves headroom for
-# ONNX Runtime's arenas (native memory outside the Java heap); the native-access flag is JEP 472 —
-# the extracted-layout launcher is not started with -jar, so the jar's manifest attribute
-# equivalent does not apply here.
+# Flags here rather than JAVA_TOOL_OPTIONS, which every JVM in the container would inherit and echo
+# to stderr. MaxRAMPercentage leaves headroom for ONNX Runtime's arenas (native memory, outside the
+# heap); the native-access flag is JEP 472, needed because the extracted-layout launcher is not
+# started with -jar and so cannot use the manifest attribute.
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=65", "--enable-native-access=ALL-UNNAMED", \
             "org.springframework.boot.loader.launch.JarLauncher"]

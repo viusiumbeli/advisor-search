@@ -1,10 +1,6 @@
 package com.advisorsearch.embedding
 
-/**
- * Tokenized text ready for the encoder, padded to a common length across the batch.
- * Deliberately not a data class: the array fields make generated value semantics wrong, and nothing
- * compares or copies batches.
- */
+/** Tokenized text ready for the encoder, padded to a common length across the batch. */
 class TokenizedBatch(
     val inputIds: Array<LongArray>,
     val attentionMask: Array<LongArray>,

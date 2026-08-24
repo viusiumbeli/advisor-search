@@ -9,9 +9,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.validation.annotation.Validated
 
 /*
- * All configuration is validated at startup — the same fail-fast principle the embedding config
- * applies to the model file. A zero max-limit or a negative floor would not crash on boot; it
- * would quietly return wrong search results, which is worse.
+ * Validated at startup: a zero max-limit or a negative floor would not crash on boot, it would
+ * quietly return wrong search results, which is worse.
  */
 
 @Validated

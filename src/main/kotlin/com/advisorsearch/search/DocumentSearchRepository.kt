@@ -28,12 +28,9 @@ class DocumentSearchRepository(
     private val jdbc: JdbcClient,
 ) {
     /**
-     * The lexical arm. Full-text search is what finds rare exact tokens — a policy number, a
-     * surname, a reference code — which embeddings treat as noise because they carry no semantics.
-     *
-     * `websearch_to_tsquery` combines terms with AND, so a two-word query only matches documents
-     * containing both. That is why fusion must be a union: for "address proof" this arm legitimately
-     * returns nothing and the semantic arm carries the result.
+     * The lexical arm, which finds the rare exact tokens embeddings treat as noise — a policy number,
+     * a reference code. `websearch_to_tsquery` combines terms with AND, so this arm legitimately
+     * returns nothing for many queries; that is why fusion is a union and not a join.
      */
     fun keywordSearch(
         query: String,
@@ -58,12 +55,9 @@ class DocumentSearchRepository(
             .list()
 
     /**
-     * The semantic arm, and the one that answers "address proof" with a utility bill.
-     *
-     * The scan is exact rather than approximate: at this corpus size a full cosine scan is
-     * sub-millisecond, and an exact scan cannot miss a neighbour the way an ANN index can. The inner
-     * query takes the globally nearest chunks; `DISTINCT ON` then keeps each document's single best
-     * chunk, which is both the ranking score and the snippet.
+     * The semantic arm. The inner query takes the globally nearest chunks and `DISTINCT ON` keeps each
+     * document's best one, which is both its score and its snippet. The scan is exact, not approximate
+     * — see docs/operating-notes.md, "There is deliberately no ANN index".
      */
     fun semanticSearch(
         queryVector: FloatArray,

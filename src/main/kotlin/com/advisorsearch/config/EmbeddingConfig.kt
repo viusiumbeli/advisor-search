@@ -26,10 +26,7 @@ class EmbeddingConfig {
         tokenizer: WordPieceTokenizer,
     ): Chunker = Chunker(tokenizer, properties.chunkTokens, properties.chunkOverlapTokens)
 
-    /**
-     * Fails at startup rather than on the first search. A missing model file is a deployment
-     * mistake, and the readiness probe should never report a healthy instance that cannot embed.
-     */
+    /** Fails at startup, not on the first search: readiness must never pass on an instance that cannot embed. */
     private fun existing(path: String): Path {
         val resolved = Path.of(path).toAbsolutePath()
         check(resolved.isRegularFile()) {

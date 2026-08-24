@@ -14,10 +14,7 @@ data class Document(
     val createdAt: OffsetDateTime,
 )
 
-/**
- * The wire shape; required fields nullable for the same reason as [com.advisorsearch.clients.CreateClientRequest]:
- * nullability buys per-field validation messages and is resolved exactly once in [toNewDocument].
- */
+/** Wire shape; required fields nullable for the reason given on [com.advisorsearch.clients.CreateClientRequest]. */
 data class CreateDocumentRequest(
     @field:NotBlank(message = "must not be blank")
     @field:Size(max = 500, message = "must be at most 500 characters")
@@ -26,7 +23,6 @@ data class CreateDocumentRequest(
     val content: String?,
 )
 
-/** A validated, normalised document: what the rest of the application works with. */
 data class NewDocument(
     val title: String,
     val content: String,
@@ -34,12 +30,7 @@ data class NewDocument(
 
 fun CreateDocumentRequest.toNewDocument(): NewDocument = NewDocument(title = title!!.trim(), content = content!!.trim())
 
-/**
- * Extractive summary: the chunks nearest the document's own centroid, returned in reading order.
- *
- * It is a selection, not a generation, so every sentence is verbatim from the document and no
- * second model is involved.
- */
+/** Extractive summary: the chunks nearest the document's own centroid, in reading order. */
 data class DocumentSummary(
     val documentId: UUID,
     val title: String,
@@ -48,10 +39,6 @@ data class DocumentSummary(
     val passages: List<SummaryPassage>,
 )
 
-/**
- * One passage of an extractive summary: a chunk verbatim from the document, its position in reading
- * order, and how close it sits to the document's own embedding centroid.
- */
 data class SummaryPassage(
     val chunkIndex: Int,
     val text: String,
