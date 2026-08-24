@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Load-tests a running instance and prints README-ready markdown rows: search latency across
-# corpus scales and concurrency levels, ingest under load, and a mixed workload.
+# Load-tests a running instance and prints the markdown rows that docs/load-and-limits.md is built
+# from: search latency across corpus scales and concurrency levels, ingest under load, and a mixed
+# workload.
 #
 # This script WRITES documents and multiplies the corpus in place, so run it against a
 # disposable stack, never one whose data you keep:
@@ -86,8 +87,8 @@ ingest_one() { # <payload-file> -> echoes seconds
 
 # One set-based generation pass per scale: copy the pristine seed documents (snapshotted below)
 # with fresh uuidv7 ids; chunks are copied with their embeddings, and the generated fts column
-# recomputes itself on insert. This is the same grow-by-copying methodology as the README's
-# exact-scan and 200k-clients measurements.
+# recomputes itself on insert. This is the same grow-by-copying methodology as the exact-scan and
+# 200k-clients measurements in docs/operating-notes.md.
 grow_documents() { # <from-gen> <to-gen>
   psql_db <<SQL
 CREATE TEMP TABLE m AS
@@ -230,12 +231,12 @@ echo "  10 KB single at large corpus: ${T}s"
 
 # --- report ------------------------------------------------------------------------------------
 
-say "README-ready rows: search"
+say "Rows for docs/load-and-limits.md: search"
 echo '| Corpus | Concurrency | p50 | p95 | p99 | max | Throughput |'
 echo '| --- | --- | --- | --- | --- | --- | --- |'
 cat "$SEARCH_ROWS"
 
-say "README-ready rows: ingest"
+say "Rows for docs/load-and-limits.md: ingest"
 echo '| Scenario | Result |'
 echo '| --- | --- |'
 cat "$INGEST_ROWS"

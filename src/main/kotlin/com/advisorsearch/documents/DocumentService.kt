@@ -23,8 +23,8 @@ class DocumentService(
     /**
      * Ingest is synchronous: the 201 means the document is chunked, embedded and searchable, with no
      * window in which a client can read back a document that search cannot find. That holds while
-     * ingest stays in the low seconds; the README records the p99 at which this should become a
-     * background job instead.
+     * ingest stays in the low seconds; docs/operating-notes.md records the p99 at which this should
+     * become a background job instead.
      */
     fun create(
         clientId: UUID,

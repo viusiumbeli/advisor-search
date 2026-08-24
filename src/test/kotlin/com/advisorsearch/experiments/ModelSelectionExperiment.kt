@@ -24,8 +24,8 @@ import kotlin.math.sqrt
  *   ./gradlew test --tests '*ModelSelectionExperiment' -i \
  *       -Dcandidates=/path/containing/multiqa,msmarco,e5small,bgesmall
  *
- * Each subdirectory holds that model's model.onnx and tokenizer.json. The result is reported in the
- * README under "Why the task's own example needs more than a model".
+ * Each subdirectory holds that model's model.onnx and tokenizer.json. The result is reported in
+ * docs/search-design.md under "Why the task's own example needs more than a model".
  */
 class ModelSelectionExperiment {
     private val candidates =

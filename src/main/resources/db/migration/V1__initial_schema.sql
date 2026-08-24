@@ -85,4 +85,5 @@ CREATE TABLE document_chunks (
 CREATE INDEX idx_chunks_document ON document_chunks (document_id);
 
 -- No ANN index (HNSW/IVFFlat) on purpose: at this corpus size an exact scan is sub-millisecond and
--- cannot miss a neighbour, which an approximate index can. See README section "Why no ANN index".
+-- cannot miss a neighbour, which an approximate index can. See docs/operating-notes.md,
+-- "There is deliberately no ANN index".
