@@ -6,6 +6,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.context.TestPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
 
 /**
  * The deployed instance runs with a key set, docker compose does not. Pins both halves of that
@@ -39,6 +40,13 @@ class ApiKeyFilterTest(
                 param("q", "anything")
                 header("X-API-Key", "test-secret-key")
             }.andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun `the demo corpus loader is data like anything else`() {
+        // It is registered unconditionally rather than behind a profile, so on a keyed instance the
+        // key is the only thing standing between a stranger and ten clients they did not ask for.
+        mockMvc.post("/demo-corpus").andExpect { status { isUnauthorized() } }
     }
 
     @Test

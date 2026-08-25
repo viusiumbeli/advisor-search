@@ -19,4 +19,6 @@ class ClientService(
     fun findByEmail(email: String): Client? = repository.findByEmail(email)
 
     fun exists(id: UUID): Boolean = repository.exists(id)
+
+    fun anyExist(): Boolean = repository.anyExist()
 }

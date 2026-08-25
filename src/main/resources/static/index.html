@@ -61,6 +61,8 @@
   .go:disabled { opacity: 0.6; cursor: default; }
 
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+  /* Needed because the display above otherwise beats the browser's own rule for [hidden]. */
+  .chips[hidden] { display: none; }
   .chips-label { flex-basis: 100%; font-size: 13px; color: var(--muted); }
   .chip {
     padding: 7px 14px; font-size: 14px; color: var(--ink);
@@ -168,14 +170,28 @@
     <button class="go" id="go">Search</button>
   </div>
 
-  <div class="chips" id="chips">
-    <span class="chips-label">From the brief, one click each (they assume the demo corpus):</span>
+  <!-- All three start hidden; the load probe reveals whichever state this instance is in. -->
+  <div class="chips" id="chips" hidden>
+    <span class="chips-label">From the brief, one click each:</span>
     <button class="chip" data-q="AldgateWealth">AldgateWealth — email fragment finds the client</button>
     <button class="chip" data-q="address proof">address proof — finds the electricity bill</button>
     <button class="chip" data-q="PLC-88213">PLC-88213 — exact token, keyword arm</button>
     <button class="chip" data-q="Delacroix-Whitfeld">Delacroix-Whitfeld — misspelled surname</button>
     <button class="chip" data-q="photosynthesis in tropical rainforest canopies">no plausible answer → empty, not noise</button>
   </div>
+
+  <div id="seed-offer" hidden>
+    <p class="note">This instance is empty, so the brief's examples have nothing to find. The demo corpus is
+      10 clients and 20 documents; loading it posts them through the ordinary endpoints, so every document is
+      chunked and embedded on the way in. That takes a few seconds — and there is no way to remove them
+      again from here.</p>
+    <button class="go" id="seed">Load the demo corpus</button>
+    <div class="form-note" id="seed-note"></div>
+  </div>
+
+  <p class="note" id="corpus-occupied" hidden>This instance holds data of its own rather than the demo corpus,
+    so the brief's examples have nothing to match — search for what you posted. The demo corpus loads only into
+    an empty instance.</p>
 
   <div id="status"></div>
   <div id="results"></div>
@@ -485,6 +501,76 @@ $("#document-form").addEventListener("submit", async (event) => {
   }
 });
 
+// --- demo corpus -------------------------------------------------------------------------------
+
+// The examples above are about documents a deployed instance does not have, because it starts empty.
+// Three states, one renderer: show the examples only when the corpus they assume is loaded, offer to
+// load it only when that would succeed, and when the instance holds records of its own show neither —
+// a load then is a 409, and a button whose only outcome is a refusal is worse than no button. Null
+// (offline, still starting, no key yet) shows nothing rather than guessing wrong.
+function showCorpusState(state) {
+  $("#chips").hidden = state !== "seeded";
+  $("#seed-offer").hidden = state !== "empty";
+  $("#corpus-occupied").hidden = state !== "occupied";
+}
+
+// Two searches answer it, so nothing new has to be exposed to read corpus state. "Marlow Court" is a
+// token from a seeded document title rather than from a client: the obvious probe, AldgateWealth, is
+// a substring of the email the New document form offers as its placeholder, so a single client
+// created from that hint would light up five examples that match nothing. "@" carries no
+// alphanumerics, so the fuzzy arm is skipped and it is a plain substring match that every stored
+// email satisfies — which is what separates "empty" from "holds records of its own".
+async function refreshCorpusState() {
+  try {
+    const seeded = await api("/search?q=Marlow+Court&limit=1");
+    if (!seeded.ok) return showCorpusState(null);
+    if ((await seeded.json()).length) return showCorpusState("seeded");
+    const anyone = await api("/search?q=%40&limit=1");
+    if (!anyone.ok) return showCorpusState(null);
+    showCorpusState((await anyone.json()).length ? "occupied" : "empty");
+  } catch {
+    showCorpusState(null);
+  }
+}
+
+// The one slow call the console makes: twenty documents to chunk and embed. It follows runSearch
+// rather than the two forms — disabled for the whole wait, restored in a finally — because a second
+// click would mean a second load, and it says what it is doing in words, which the forms' "…" would
+// not over that long.
+$("#seed").addEventListener("click", async () => {
+  const button = $("#seed"), note = $("#seed-note");
+  button.disabled = true;
+  note.className = "form-note";
+  note.textContent = "Loading 10 clients and 20 documents, chunked and embedded on the way in. It finishes " +
+    "at the server whether or not this tab waits for it.";
+  try {
+    const response = await api("/demo-corpus", { method: "POST" });
+    if (response.ok) {
+      const summary = await response.json();
+      // The confirmation goes to #status rather than here, because the offer is hidden the moment the
+      // state flips and would take its own note with it. Being wiped by the next search is the right
+      // lifetime for it: click an example and the results replace it.
+      status_.innerHTML = `<p class="note">Demo corpus loaded — ${esc(summary.clients_created)} clients and
+        ${esc(summary.documents_created)} documents, chunked, embedded and searchable now.</p>`;
+      showCorpusState("seeded");
+      return;
+    }
+    note.className = "form-note bad";
+    note.textContent = await problemMessage(response);
+    // A 409 says the corpus stopped being empty while the button was on screen. Which state it is in
+    // now is the server's to answer, so ask instead of assuming.
+    if (response.status === 409) await refreshCorpusState();
+  } catch (e) {
+    // A 401 gets no message of its own: api() has already raised the dialog. The pending note still
+    // has to go, because it claims a load is running and none is.
+    const failed = e.message !== "unauthorized";
+    note.className = failed ? "form-note bad" : "form-note";
+    note.textContent = failed ? e.message : "";
+  } finally {
+    button.disabled = false;
+  }
+});
+
 // --- wiring ------------------------------------------------------------------------------------
 
 $("#go").addEventListener("click", () => runSearch($("#q").value));
@@ -501,6 +587,9 @@ $("#key-form").addEventListener("submit", () => {
   setKey($("#key-input").value.trim());
   $("#key-input").value = "";
   updateKeyState();
+  // A key arriving is the moment the corpus question becomes answerable at all. Asking with one we
+  // already know is missing would only 401 and reopen the dialog on the spot.
+  if (getKey()) refreshCorpusState();
 });
 
 // On load: one cheap probe decides whether this instance wants a key, and it is sent *without* the
@@ -518,6 +607,10 @@ $("#key-form").addEventListener("submit", () => {
     if (keyRequired && !getKey()) promptForKey();
   } catch { /* offline; searching will surface the error */ }
   updateKeyState();
+  // Which examples to show needs a request that is allowed to answer: on a protected instance the
+  // probe above is a 401 that says nothing about the corpus, so that case waits for the dialog and
+  // refreshes from there instead.
+  if (!keyRequired || getKey()) refreshCorpusState();
 })();
 </script>
 </body>
