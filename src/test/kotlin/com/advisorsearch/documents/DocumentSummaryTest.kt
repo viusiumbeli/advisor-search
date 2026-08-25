@@ -48,13 +48,15 @@ class DocumentSummaryTest(
     }
 
     @Test
-    fun `a short document summarises to its own chunks`() {
+    fun `a short document summarises to all of its own chunks`() {
         val id = documentTitled("ISA Transfer Confirmation")
 
         val summary = service.summarise(id)
 
-        assertTrue(summary.passages.size <= summary.chunkCount)
-        assertTrue(summary.passages.isNotEmpty())
+        // Not "no more than its chunks", which the query's own LIMIT makes true however few rows
+        // come back: a document at or under the passage budget has to be returned whole, and one
+        // above it has to fill the budget exactly.
+        assertEquals(minOf(summary.chunkCount, PASSAGE_BUDGET), summary.passages.size)
     }
 
     @Test
@@ -78,4 +80,9 @@ class DocumentSummaryTest(
             .param("title", title)
             .query(UUID::class.java)
             .single()
+
+    private companion object {
+        /** `SUMMARY_PASSAGES` in DocumentService, which is private to it. */
+        const val PASSAGE_BUDGET = 3
+    }
 }

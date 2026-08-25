@@ -19,7 +19,7 @@ Every number here and in [Load and limits](load-and-limits.md) was measured on a
 | Ingesting the longest document (15,707 chars, 22 chunks) | 757 ms |
 | `GET /search`, one probe, warm | 24 ms median |
 | `GET /search`, 5 expansion probes, warm (batched inference) | 50 ms median |
-| Test suite (66 tests, from clean, no build cache) | 27 s |
+| Test suite (87 tests, from clean, no build cache) | 39 s |
 | API container resident memory | 760 to 840 MiB |
 | Image size | 576 MB |
 
@@ -85,6 +85,17 @@ beyond Postgres.
 Every chunk row records the model that produced it, and startup fails with a "reindex required"
 message if the corpus contains vectors from a different model. Vectors from two models share a
 column but not a space, and comparing them produces confident nonsense rather than an error.
+
+## Readiness gates traffic, not only the probe
+
+Tomcat accepts connections as soon as the context refreshes, which is before the model check, the
+warmup and the seed runner have run — so the published port is open while the corpus is still being
+embedded. A filter answers `503` on everything except the probes, the API documentation and the
+console page until Spring Boot flips readiness, which it does only once every runner has returned.
+Without it the window is not merely cosmetic: a `POST` landing inside it can commit vectors from one
+model into a corpus built by another, moments before the check that exists to catch that fails the
+instance, and under `restart: unless-stopped` the window reopens on every crash-loop iteration. The
+Caddy sidecar waits on the same signal, through `depends_on: condition: service_healthy`.
 
 ## Postgres extensions
 
@@ -163,9 +174,14 @@ printf 'POSTGRES_PASSWORD=%s\nAPI_KEY=%s\n' "$(openssl rand -hex 24)" "$(openssl
   > /opt/advisor-search/.env
 ```
 
+Both secrets are interpolated with `:?`, so a stack started without that `.env` stops with the
+missing variable named instead of coming up. That matters most for `API_KEY`: an empty key is how
+authentication is switched off locally, so substituting one here would serve client records to the
+internet unauthenticated, and the failure would look exactly like a working deployment.
+
 Then, from a checkout of this repository, copy up the production compose file and the Caddyfile and
 start the stack. [`deploy/docker-compose.prod.yml`](../deploy/docker-compose.prod.yml) is the local
-compose with six deliberate differences, listed and justified in its header:
+compose with seven deliberate differences, listed and justified in its header:
 
 ```bash
 scp deploy/docker-compose.prod.yml root@<ip>:/opt/advisor-search/docker-compose.yml
@@ -228,7 +244,7 @@ has.
   so there is no coroutines-on-MVC middle path. Post-virtual-threads, reactive earns its keep in
   streaming and high-fan-out services; this is neither.
 - **An ORM, Spring Data, or jOOQ.** `JdbcClient` is Spring's 2023 API for exactly this shape of
-  service — the SQL is the product here (`DISTINCT ON` over a KNN subquery, `ts_headline`,
+  service — the SQL is the product here (a per-document KNN aggregate, `ts_headline`,
   `word_similarity`, a transaction-local `set_config`), and every abstraction degenerates to
   native-SQL strings for these queries while adding machinery for the two trivial inserts. jOOQ is
   the escalation path if this grew to dozens of typed queries; Spring Data JDBC is the addition if

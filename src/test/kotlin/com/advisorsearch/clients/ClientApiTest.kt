@@ -1,13 +1,22 @@
 package com.advisorsearch.clients
 
 import com.advisorsearch.IntegrationTest
+import org.hamcrest.Matchers.containsString
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
+/**
+ * Transactional for the reason given on SchemaConstraintTest: the suite shares one database, and a
+ * client left behind here is a client competing for a place in another class's result page. MockMvc
+ * calls the controller on the test's own thread, so the writes made through the API join this
+ * transaction and roll back with it.
+ */
+@Transactional
 class ClientApiTest(
     private val mockMvc: MockMvc,
 ) : IntegrationTest() {
@@ -50,6 +59,21 @@ class ClientApiTest(
                 content { contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON) }
                 jsonPath("$.errors.firstName") { exists() }
                 jsonPath("$.errors.email") { exists() }
+            }
+    }
+
+    @Test
+    fun `rejects a name of Unicode whitespace`() {
+        // The escape is JSON's, not Kotlin's — a raw string leaves it alone — so the body carries a
+        // real non-breaking space. It passes @NotBlank and would reach the insert as "".
+        mockMvc
+            .post("/clients") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"first_name":"\u00a0","last_name":"Doe","email":"nbsp.${UUID.randomUUID()}@example.com"}"""
+            }.andExpect {
+                status { isBadRequest() }
+                content { contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON) }
+                jsonPath("$.detail") { value(containsString("first_name")) }
             }
     }
 

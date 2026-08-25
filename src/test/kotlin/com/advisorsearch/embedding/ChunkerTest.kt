@@ -1,7 +1,6 @@
 package com.advisorsearch.embedding
 
 import org.junit.jupiter.api.Test
-import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -30,16 +29,38 @@ class ChunkerTest {
 
     @Test
     fun `consecutive chunks overlap`() {
-        val chunks = chunker.chunk(longDocument())
+        // Short paragraphs on purpose. The carry-over budget is 30 tokens, so a document built from
+        // 140-token paragraphs has nothing small enough to carry and overlaps by nothing at all —
+        // and an assertion made on that document passes anyway, because its repetitive sentences
+        // reappear in the next chunk whether they were carried there or written there.
+        val content = (1..80).joinToString("\n\n") { "Point $it: the adviser confirmed the arrangement." }
 
-        // The tail of one chunk should reappear at the head of the next, so a passage that straddles
-        // a boundary is still whole somewhere.
-        val overlaps =
-            chunks.zipWithNext().count { (first, second) ->
-                val tail = first.takeLast(60)
-                second.contains(tail.substringAfter(' ').trim())
-            }
-        assertTrue(overlaps > 0, "no overlap found between any consecutive chunks")
+        val chunks = chunker.chunk(content)
+
+        assertTrue(chunks.size > 1, "expected the document to be split")
+        chunks.zipWithNext().forEach { (first, second) ->
+            val tail = first.split("\n\n").last()
+            assertTrue(second.contains(tail), "a chunk's tail must reappear in the next one, missing: $tail")
+        }
+    }
+
+    @Test
+    fun `a chunk stays inside the budget when overlap is carried into it`() {
+        // Two short paragraphs and then one sentence that nearly fills the budget by itself. The
+        // long piece cannot be appended to the tail carried over from the chunk just emitted:
+        // overlap plus a full-size piece lands past the budget, which is the silent truncation at
+        // the encoder window that the budget exists to prevent.
+        val content =
+            "Note one: the fee basis was confirmed.\n\nNote two: the fee basis was confirmed.\n\n" +
+                (1..194).joinToString(" ") { "review" } + "."
+
+        val chunks = chunker.chunk(content)
+
+        assertTrue(chunks.size > 1, "expected the document to be split")
+        chunks.forEach { chunk ->
+            val tokens = tokenizer.count(chunk)
+            assertTrue(tokens <= 200, "chunk of $tokens tokens exceeded the 200 token budget: ${chunk.take(80)}")
+        }
     }
 
     @Test
@@ -99,8 +120,91 @@ class ChunkerTest {
         val chunks = chunker.chunk(content)
 
         assertTrue(chunks.size > 1)
-        assertContains(chunks.joinToString(" "), "Wiśniewski")
-        assertContains(chunks.joinToString(" "), "日本語")
+        // Every paragraph whole in some chunk, rather than the marker words present somewhere in
+        // the joined output: the markers repeat forty times, so one surviving copy would satisfy
+        // that while every boundary mangled its neighbours.
+        content.split("\n\n").forEach { paragraph ->
+            assertTrue(
+                chunks.any { it.contains(paragraph) },
+                "a paragraph did not survive whole: ${paragraph.take(40)}…",
+            )
+        }
+    }
+
+    @Test
+    fun `a hard split never cuts a character in half`() {
+        // No spaces and no sentence punctuation, so every cut is made by character count. Each
+        // glyph here is a surrogate pair, and the leading 'x' puts the pairs on odd indices, so a
+        // cut that ignores them lands between the halves of one.
+        val wall = "x" + "🏦".repeat(2_000)
+
+        val chunks = chunker.chunk(wall)
+
+        assertTrue(chunks.size > 1, "expected the wall to be split")
+        chunks.forEach { chunk ->
+            // Half a surrogate pair survives as a Kotlin String but not as UTF-8, which is how it
+            // would reach Postgres — the round trip is what makes the damage visible.
+            assertEquals(
+                chunk,
+                String(chunk.toByteArray(Charsets.UTF_8), Charsets.UTF_8),
+                "a chunk carries half a character",
+            )
+            assertTrue(wall.contains(chunk), "chunk is not verbatim")
+        }
+    }
+
+    @Test
+    fun `consecutive paragraph breaks are reproduced exactly`() {
+        // Four newlines are two paragraph breaks with nothing between them. Dropping the empty
+        // segment's separator would join the paragraphs with less whitespace than the document has.
+        val content = (1..40).joinToString("\n\n\n\n") { "Paragraph $it of the schedule of charges." }
+
+        chunker.chunk(content).forEach { chunk ->
+            assertTrue(content.contains(chunk), "chunk is not verbatim: ${chunk.take(70)}…")
+        }
+    }
+
+    @Test
+    fun `whitespace before a paragraph break survives`() {
+        // Two trailing spaces are a hard line break in markdown and ordinary in pasted text. The
+        // paragraph is too long to fit, so it is split by sentence — and the sentence boundary
+        // swallows exactly those two spaces on its way out of the paragraph.
+        val long = (1..24).joinToString(" ") { "Sentence $it explains the fee arrangement in the schedule of charges." }
+        val content = "$long  \n\nShort closing note."
+
+        chunker.chunk(content).forEach { chunk ->
+            assertTrue(content.contains(chunk), "chunk is not verbatim: …${chunk.takeLast(60)}")
+        }
+    }
+
+    @Test
+    fun `a long run of whitespace is not lost between two sentences`() {
+        // Longer than the character ceiling, so it cannot be carried inside a piece and has to
+        // survive as the gap between two of them.
+        val content = "Opening note on the fee basis." + " ".repeat(3_000) + "Closing note on the same."
+
+        val chunks = chunker.chunk(content)
+
+        chunks.forEach { chunk -> assertTrue(content.contains(chunk), "chunk is not verbatim: ${chunk.take(40)}…") }
+        assertTrue(
+            chunks.any { it.contains("Opening note") } && chunks.any { it.contains("Closing note") },
+            "both sentences must still be present, got ${chunks.size} chunk(s)",
+        )
+    }
+
+    @Test
+    fun `irregular whitespace survives a hard split`() {
+        // A pasted table: nothing to break on, columns separated by tabs and by double spaces. Both
+        // have to come back as they were, or a chunk stops being a substring of the document and
+        // the snippet built from it misquotes the source.
+        val content = (1..120).joinToString("  ") { "column$it\tvalue$it" }
+
+        val chunks = chunker.chunk(content)
+
+        assertTrue(chunks.size > 1, "expected the table to be split")
+        chunks.forEach { chunk ->
+            assertTrue(content.contains(chunk), "chunk is not verbatim: ${chunk.take(70)}…")
+        }
     }
 
     @Test

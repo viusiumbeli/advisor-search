@@ -151,9 +151,10 @@ two arms — a literal substring match scoring 1.0, and `word_similarity` for ty
 **Documents get two retrievers.** A stored `tsvector` with `setweight` (title A, content B) finds
 rare exact tokens that embeddings treat as noise, like the policy number `PLC-88213`. Alongside it,
 documents are chunked to ~200 wordpieces and embedded with `all-MiniLM-L6-v2` as `vector(384)`, and
-search takes the globally nearest chunks and keeps the best one per document. Because
-`websearch_to_tsquery` combines terms with AND, the lexical arm legitimately returns nothing for
-many queries — which is why the two arms are unioned, not joined.
+search reduces the corpus to each document's own nearest chunk and shortlists the best thirty —
+counted in documents rather than chunks, so a long report cannot fill the shortlist and crowd a
+short one out of it. Because `websearch_to_tsquery` combines terms with AND, the lexical arm
+legitimately returns nothing for many queries — which is why the two arms are unioned, not joined.
 
 **The rankings are fused, not blended.** `ts_rank_cd` and cosine similarity are on unrelated scales,
 so the two lists are combined with reciprocal rank fusion — `1/(k + rank)`, `k = 60` — which
@@ -191,9 +192,9 @@ rank, so results sliding down the list is visible even while every query still p
 | Retrieval quality | documents 18/18 hit@5 (MRR 0.778), clients 7/7 (MRR 0.929) |
 | `GET /search`, warm | 24 ms median, 50 ms when a query expands to five probes |
 | Under concurrency | p95 130 ms at 20 concurrent clients, 188 req/s |
-| Ingest | 269 ms for a 10 KB document, 1.7 s at the 100,000-character cap |
+| Ingest | 269 ms for a 10 KB document, 2.3 s at the 100,000-character cap |
 | Exact vector scan | the right choice to ~50,000 chunks, where an HNSW index starts to earn its keep |
-| Startup and tests | healthy 20 s after `docker compose up`; 66 tests from clean in 27 s |
+| Startup and tests | healthy 20 s after `docker compose up`; 87 tests from clean in 39 s |
 
 Sustained-load tables across three corpus scales, and the ceilings the system runs against, are in
 [load and limits](docs/load-and-limits.md); the design notes behind these numbers are in

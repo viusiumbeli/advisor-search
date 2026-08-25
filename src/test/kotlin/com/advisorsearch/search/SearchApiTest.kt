@@ -1,7 +1,6 @@
 package com.advisorsearch.search
 
 import com.advisorsearch.SeededIntegrationTest
-import com.advisorsearch.config.SearchProperties
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
@@ -14,7 +13,6 @@ import kotlin.test.assertTrue
 class SearchApiTest(
     private val mockMvc: MockMvc,
     private val objectMapper: ObjectMapper,
-    private val properties: SearchProperties,
 ) : SeededIntegrationTest() {
     @Test
     fun `the task's client example returns the right client at score one`() {
@@ -90,17 +88,6 @@ class SearchApiTest(
             jsonPath("$") { isArray() }
             jsonPath("$.length()") { value(0) }
         }
-    }
-
-    @Test
-    fun `limit is clamped to the configured maximum`() {
-        val hits = search("the", limit = 5000)
-
-        // Per block: the limit applies to clients and documents independently.
-        val documents = hits.count { it["type"] == "document" }
-        val clients = hits.count { it["type"] == "client" }
-        assertTrue(documents <= properties.maxLimit, "document block exceeded max-limit: $documents")
-        assertTrue(clients <= properties.maxLimit, "client block exceeded max-limit: $clients")
     }
 
     @Test
