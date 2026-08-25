@@ -10,8 +10,8 @@
 #   5. ECS JSON logs, because here the reader is `docker logs`, not a person at a terminal.
 #   6. A Caddy sidecar terminates TLS on 443 (Caddyfile alongside this file) and is the only way
 #      in: api publishes no port and is reached over the compose network. Locally there is no TLS.
-#   7. No seed profile: the reviewer posts his own data, so the instance starts and stays empty.
-#      The dev compose seeds a demo corpus by default.
+#   7. No seed profile: the reviewer posts his own data, so the instance starts empty and is only
+#      filled if someone asks, through POST /demo-corpus. The dev compose seeds by default.
 #
 # Both secrets are interpolated with `:?`, so a missing or mis-sourced .env stops compose with a
 # named variable rather than starting the stack. That matters most for API_KEY: an empty key is how

@@ -19,10 +19,13 @@ ONNX Runtime.
 
 ## Live demo
 
-Open <https://95.217.189.232/> — an advisor console over the whole API. The instance starts
-empty, so the data you post is all it holds; the seeded tour with the brief's examples is one
-`docker compose up` away locally. The console asks once for the API key, which is in the
-submission email and deliberately not committed. The same key works against the API directly:
+Open <https://95.217.189.232/> — an advisor console over the whole API. The instance starts empty, so
+the data you post is all it holds. Because the brief's example queries are about documents an empty
+instance does not have, the console offers to load the demo corpus — 10 clients and 20 documents,
+through the ordinary endpoints — and shows those examples only once it is there. It is refused once
+the instance holds anything, so it can never mix with your data. The console asks once for the API
+key, which is in the submission email and deliberately not committed. The same key works against the
+API directly:
 
 ```bash
 curl -sG https://95.217.189.232/search \
@@ -40,7 +43,7 @@ HTTP behind it.
 ```bash
 docker compose pull        # optional: a prebuilt amd64/arm64 image, so nothing is compiled locally
 docker compose up          # ~20s from clean to healthy; builds the image first if it was not pulled
-./demo.sh                  # a guided tour of every endpoint (needs jq)
+./demo.sh                  # a guided tour of the API (needs jq)
 ```
 
 The console comes up on <http://localhost:8080/> with Swagger UI at
@@ -106,6 +109,7 @@ into that list was the hardest part of the task, written up in
 | `GET` | `/documents/{id}` | The document including its full content, or `404`. |
 | `GET` | `/documents/{id}/summary` | Extractive summary: the passages nearest the document's own centroid, in reading order. |
 | `GET` | `/search?q=&limit=` | The search. `q` is required and must be non-blank; `limit` defaults to 10 and is clamped to 50. |
+| `POST` | `/demo-corpus` | Loads the demo corpus (10 clients, 20 documents) into an **empty** instance and reports what it created. `409` once the instance holds anything. Synchronous, so it takes a few seconds. |
 | `GET` | `/actuator/health` | Liveness and readiness. Readiness waits for the embedding model. |
 
 Live OpenAPI at `/swagger-ui.html`; the console at `/` drives every endpoint from a browser.
@@ -124,7 +128,7 @@ is one `GET /documents/{id}` away.
 
 ### Extensions to the given schema
 
-Three additions, each because the fragment specifies a shape rather than a whole API:
+Four additions, each because the fragment specifies a shape rather than a whole API:
 
 - **`409` on a duplicate email.** Advisors search by email, which makes it the identity key.
 - **The `GET` endpoints.** A `201` with a `Location` header and search results with snippets are
@@ -132,6 +136,10 @@ Three additions, each because the fragment specifies a shape rather than a whole
 - **`score`, `matched_on` and `snippet` on search hits.** The fragment types search results as
   `type: object`, and a result you cannot explain is hard to trust. `matched_on` is `email`, `name`,
   `description` or `profile` for clients, and `keyword`, `semantic` or `both` for documents.
+- **`POST /demo-corpus`.** Not part of the API the brief describes, and it says so with its own
+  `Demo` tag. It exists because a deployed instance that starts empty cannot demonstrate the brief's
+  own examples, and asking a reviewer to run the project locally to see them is a worse answer than
+  a button. Refusing unless the corpus is empty is the whole of its safety.
 
 For a fuzzy client match `matched_on` is deliberately `profile` rather than a field name: the
 similarity is computed over the whole profile, so no single field is responsible and naming one
@@ -194,7 +202,7 @@ rank, so results sliding down the list is visible even while every query still p
 | Under concurrency | p95 130 ms at 20 concurrent clients, 188 req/s |
 | Ingest | 269 ms for a 10 KB document, 2.3 s at the 100,000-character cap |
 | Exact vector scan | the right choice to ~50,000 chunks, where an HNSW index starts to earn its keep |
-| Startup and tests | healthy 20 s after `docker compose up`; 87 tests from clean in 39 s |
+| Startup and tests | healthy 20 s after `docker compose up`; 91 tests from clean in 32 s |
 
 Sustained-load tables across three corpus scales, and the ceilings the system runs against, are in
 [load and limits](docs/load-and-limits.md); the design notes behind these numbers are in

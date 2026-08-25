@@ -19,7 +19,7 @@ Every number here and in [Load and limits](load-and-limits.md) was measured on a
 | Ingesting the longest document (15,707 chars, 22 chunks) | 757 ms |
 | `GET /search`, one probe, warm | 24 ms median |
 | `GET /search`, 5 expansion probes, warm (batched inference) | 50 ms median |
-| Test suite (87 tests, from clean, no build cache) | 39 s |
+| Test suite (91 tests, from clean, no build cache) | 32 s |
 | API container resident memory | 760 to 840 MiB |
 | Image size | 576 MB |
 
@@ -96,6 +96,30 @@ Without it the window is not merely cosmetic: a `POST` landing inside it can com
 model into a corpus built by another, moments before the check that exists to catch that fails the
 instance, and under `restart: unless-stopped` the window reopens on every crash-loop iteration. The
 Caddy sidecar waits on the same signal, through `depends_on: condition: service_healthy`.
+
+## Seeding on demand
+
+The deployed instance starts empty, which leaves it unable to demonstrate the brief's own examples —
+they are about documents it does not have. `POST /demo-corpus` loads the same corpus the `seed`
+profile loads at startup, through the same service calls, so nothing about the data differs; only
+when it arrives does. About four seconds warm on the machine above, where the same work measured
+8.8 s cold at startup.
+
+It is registered unconditionally rather than behind a profile, because a profile-gated endpoint is
+absent exactly where it is wanted: `deploy/docker-compose.prod.yml` sets no profile at all, and
+adding one there to enable an endpoint would put the auto-seeding runner one typo away. What makes
+that safe is not a flag but a precondition — the load is refused unless the corpus is empty, so demo
+data can never mix with data somebody posted. That matters more than duplicate rows: the semantic
+floor is relative, so twenty unrelated documents can lift the cut-off past the document a search was
+looking for, and a search answering nothing reads as a broken search. The check has to run before
+`SeedService.seed()` rather than be inferred from its summary, because a second run reports
+`(0, 0, 20)` — which is also what loading nothing looks like. The guard lives on the on-demand path
+only; the startup runner still merges into whatever a persistent volume already holds.
+
+Two consequences worth knowing. Unlike the runner, this embeds *after* readiness has flipped, so for
+those seconds search competes with inference and a concurrent query sees a partly-loaded corpus —
+correct but thin. And there is no way back: with no delete endpoints by design, a 409 is cleared only
+by recreating the volume, so an instance that has been used cannot be shown the demo corpus.
 
 ## Postgres extensions
 
@@ -198,8 +222,9 @@ battle-tested process, not a timer signalling a reload across containers.
 Both generated secrets live only in `/opt/advisor-search/.env` on the server; `cat` it to read the
 API key back. No registry login is needed, because the image is public. The deployed instance runs
 without the seed profile, so it starts empty and reports ready in seconds; a seeded instance embeds
-the demo corpus first and takes ~1–2 minutes (poll `/actuator/health/readiness`). Teardown when the
-review window closes:
+the demo corpus first and takes ~1–2 minutes (poll `/actuator/health/readiness`). The corpus can be
+loaded afterwards instead, from the console or `POST /demo-corpus` — see
+[Seeding on demand](#seeding-on-demand). Teardown when the review window closes:
 
 ```bash
 hcloud server delete advisor-search

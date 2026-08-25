@@ -18,6 +18,11 @@ class InvalidRequestException(
     message: String,
 ) : ErrorResponseException(HttpStatus.BAD_REQUEST, problem(HttpStatus.BAD_REQUEST, "Invalid request", message), null)
 
+/** A well-formed request that the current state of the corpus refuses, rather than a malformed one. */
+class ConflictException(
+    message: String,
+) : ErrorResponseException(HttpStatus.CONFLICT, problem(HttpStatus.CONFLICT, "Conflict", message), null)
+
 internal fun problem(
     status: HttpStatus,
     title: String,

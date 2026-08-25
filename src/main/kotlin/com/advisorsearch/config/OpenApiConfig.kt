@@ -23,7 +23,9 @@ class OpenApiConfig {
                         "Search across clients and their documents. Clients are matched with " +
                             "trigrams over name, email and description; documents are matched by " +
                             "full-text search and by embedding similarity, combined with " +
-                            "reciprocal rank fusion.",
+                            "reciprocal rank fusion. The deployed instance starts empty; the one " +
+                            "operation under Demo loads a corpus into an empty one so the examples " +
+                            "in the README have something to find.",
                     ),
             ).components(
                 Components().addSecuritySchemes(

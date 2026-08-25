@@ -80,4 +80,7 @@ class ClientRepository(
             .param("id", id)
             .query(Boolean::class.java)
             .single()
+
+    /** Whether the corpus holds anything at all. A document references a client, so no client means none. */
+    fun anyExist(): Boolean = jdbc.sql("SELECT EXISTS(SELECT 1 FROM clients)").query(Boolean::class.java).single()
 }
