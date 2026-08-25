@@ -1,6 +1,7 @@
 package com.advisorsearch.search
 
-import com.advisorsearch.IntegrationTest
+import com.advisorsearch.SeededIntegrationTest
+import com.advisorsearch.config.SearchProperties
 import org.junit.jupiter.api.Test
 import org.springframework.jdbc.core.simple.JdbcClient
 import kotlin.test.assertEquals
@@ -14,7 +15,9 @@ import kotlin.test.assertTrue
  */
 class FtsEmailTokenisationProofTest(
     private val jdbc: JdbcClient,
-) : IntegrationTest() {
+    private val clients: ClientSearchRepository,
+    private val properties: SearchProperties,
+) : SeededIntegrationTest() {
     private val email = "jane.roe@aldgatewealth.example"
 
     @Test
@@ -71,20 +74,21 @@ class FtsEmailTokenisationProofTest(
 
     @Test
     fun `the shipped trigram predicate does match the same email`() {
-        val score =
-            jdbc
-                .sql(
-                    """
-                    SELECT GREATEST(
-                               CASE WHEN lower(:email) LIKE '%' || :query || '%' ESCAPE '\' THEN 1.0 ELSE 0.0 END,
-                               word_similarity(:query, lower(:email)))
-                    """.trimIndent(),
-                ).param("email", email)
-                .param("query", "aldgatewealth")
-                .query(Double::class.java)
-                .single()
+        // Through the repository rather than a restatement of its SQL. A proof written as a copy
+        // proves the copy: it would stay green while the shipped statement lost its `lower()` or
+        // its ESCAPE clause, and every email in this suite is stored lowercase, so nothing else
+        // would notice either.
+        val matches =
+            clients.search(
+                query = "aldgatewealth",
+                limit = 10,
+                fuzzy = true,
+                wordSimilarityThreshold = properties.wordSimilarityThreshold,
+            )
 
-        assertEquals(1.0, score, "the substring arm should score an exact containment at 1.0")
+        val hit = matches.single { it.client.email == email }
+        assertEquals(1.0, hit.score, "the substring arm should score an exact containment at 1.0")
+        assertEquals("email", hit.matchedOn, "the containment is inside the email address")
     }
 
     private fun ftsMatches(query: String): Boolean =

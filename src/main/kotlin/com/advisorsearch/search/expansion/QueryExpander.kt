@@ -43,9 +43,22 @@ class QueryExpander(
         val matched = rules.filter { rule -> rule.triggers.any(normalised::contains) }
         if (matched.isEmpty()) return listOf(query)
 
-        val probes = (listOf(query) + matched.flatMap { it.expansions }).distinct().take(MAX_PROBES)
+        val probes = (listOf(query) + interleave(matched.map { it.expansions })).distinct().take(MAX_PROBES)
         log.debug("Expanded '{}' via {} into {} probes", query, matched.map { it.concept }, probes.size)
         return probes
+    }
+
+    /**
+     * One expansion from every matched concept before a second from any of them, so the ceiling
+     * shortens each concept rather than silencing whole ones. Taken in lexicon order instead, a
+     * query naming two concepts — "proof of address and proof of identity" — spends the entire
+     * budget on whichever rule is listed first; the second concept's documents are then left
+     * scoring against the bare query, and the relative floor drops them out of the results with
+     * nothing to say they were ever considered.
+     */
+    private fun interleave(expansions: List<List<String>>): List<String> {
+        val deepest = expansions.maxOf { it.size }
+        return (0..<deepest).flatMap { position -> expansions.mapNotNull { it.getOrNull(position) } }
     }
 
     private fun normalise(text: String): String = text.lowercase().replace(WHITESPACE_RUN, " ").trim()

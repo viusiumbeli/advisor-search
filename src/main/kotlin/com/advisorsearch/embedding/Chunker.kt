@@ -1,5 +1,7 @@
 package com.advisorsearch.embedding
 
+import com.advisorsearch.support.wholeCharacterEnd
+
 private val PARAGRAPH_BREAK = Regex("\\R[ \\t]*\\R")
 private val SENTENCE_BREAK = Regex("(?<=[.!?])\\s+")
 
@@ -42,12 +44,21 @@ class Chunker(
         var chars = 0
 
         for (piece in pieces) {
-            val wouldExceed = tokens + piece.tokens > budgetTokens || chars + piece.text.length > maxChars
-            if (current.isNotEmpty() && wouldExceed) {
+            if (current.isNotEmpty() && wouldExceed(tokens, chars, piece)) {
                 chunks += render(current)
                 current = carryOver(current)
                 tokens = current.sumOf { it.tokens }
                 chars = current.sumOf { it.text.length }
+                // The carried tail is spent budget like anything else. Measuring a second time is
+                // what stops a chunk being emitted at the budget plus the overlap: 230 tokens, plus
+                // the title prepended at embedding time, is over the 256-token window and back into
+                // the silent truncation the budget exists to prevent. Dropping the tail costs
+                // nothing — it is whole in the chunk just emitted.
+                if (current.isNotEmpty() && wouldExceed(tokens, chars, piece)) {
+                    current = mutableListOf()
+                    tokens = 0
+                    chars = 0
+                }
             }
             current += piece
             tokens += piece.tokens
@@ -56,6 +67,12 @@ class Chunker(
         if (current.isNotEmpty()) chunks += render(current)
         return chunks
     }
+
+    private fun wouldExceed(
+        tokens: Int,
+        chars: Int,
+        piece: ChunkPiece,
+    ): Boolean = tokens + piece.tokens > budgetTokens || chars + piece.text.length > maxChars
 
     private fun fits(text: String): Boolean = text.length <= maxChars && tokenizer.count(text) <= budgetTokens
 
@@ -85,54 +102,57 @@ class Chunker(
         }
 
     /**
-     * Splits into pieces, remembering the exact whitespace that separated them: keeping the original
-     * separator makes a rendered chunk a true substring of the document, so a snippet quotes the
-     * source exactly rather than a whitespace-normalised approximation.
+     * Locates the pieces as spans of the document, then reads each one's separator out of the gap it
+     * left behind. Deriving the separator rather than tracking it is what makes a rendered chunk a
+     * true substring of the document — whitespace a boundary consumed cannot go missing, because
+     * nothing is holding it to be dropped — and that is what lets a snippet quote the source exactly
+     * rather than a whitespace-normalised approximation.
      */
     private fun split(content: String): List<ChunkPiece> {
-        val pieces = mutableListOf<ChunkPiece>()
-        var separator = ""
-        forEachSegment(content, PARAGRAPH_BREAK) { paragraph, nextSeparator ->
-            if (paragraph.isNotEmpty()) {
-                if (fits(paragraph)) {
-                    pieces += ChunkPiece(paragraph, separator, tokenizer.count(paragraph))
-                } else {
-                    splitSentences(paragraph).forEachIndexed { position, sentence ->
-                        pieces += if (position == 0) sentence.copy(separator = separator) else sentence
-                    }
-                }
-                separator = nextSeparator
-            }
+        val spans = mutableListOf<ChunkSpan>()
+        forEachSegment(content, 0, content.length, PARAGRAPH_BREAK) { start, end ->
+            if (fits(content.substring(start, end))) spans += ChunkSpan(start, end) else splitSentences(content, start, end, spans)
         }
-        return pieces
+
+        var previousEnd = 0
+        return spans.map { span ->
+            val text = content.substring(span.start, span.end)
+            val piece = ChunkPiece(text, content.substring(previousEnd, span.start), tokenizer.count(text))
+            previousEnd = span.end
+            piece
+        }
     }
 
-    private fun splitSentences(paragraph: String): List<ChunkPiece> {
-        val pieces = mutableListOf<ChunkPiece>()
-        var separator = " "
-        forEachSegment(paragraph, SENTENCE_BREAK) { sentence, nextSeparator ->
-            if (sentence.isNotEmpty()) {
-                val split = if (fits(sentence)) listOf(ChunkPiece(sentence, separator, tokenizer.count(sentence))) else hardSplit(sentence)
-                split.forEachIndexed { position, piece ->
-                    pieces += if (position == 0) piece.copy(separator = separator) else piece
-                }
-                separator = nextSeparator
-            }
-        }
-        return pieces
-    }
-
-    private inline fun forEachSegment(
-        text: String,
-        boundary: Regex,
-        action: (segment: String, nextSeparator: String) -> Unit,
+    private fun splitSentences(
+        content: String,
+        from: Int,
+        to: Int,
+        spans: MutableList<ChunkSpan>,
     ) {
-        var start = 0
-        for (match in boundary.findAll(text)) {
-            action(text.substring(start, match.range.first), match.value)
-            start = match.range.last + 1
+        forEachSegment(content, from, to, SENTENCE_BREAK) { start, end ->
+            if (fits(content.substring(start, end))) spans += ChunkSpan(start, end) else hardSplit(content, start, end, spans)
         }
-        action(text.substring(start), "")
+    }
+
+    /**
+     * Calls [action] with the bounds of every non-empty segment between [from] and [to]. Whatever a
+     * boundary consumes — including a run of boundaries with nothing between them — is simply left
+     * out of the spans, which is what puts it in the next piece's separator.
+     */
+    private inline fun forEachSegment(
+        content: String,
+        from: Int,
+        to: Int,
+        boundary: Regex,
+        action: (start: Int, end: Int) -> Unit,
+    ) {
+        var start = from
+        for (match in boundary.findAll(content.substring(from, to))) {
+            val matchStart = from + match.range.first
+            if (matchStart > start) action(start, matchStart)
+            start = from + match.range.last + 1
+        }
+        if (to > start) action(start, to)
     }
 
     /**
@@ -140,33 +160,55 @@ class Chunker(
      * identifier. Cuts on whitespace where there is one and verifies each piece against the
      * tokenizer, shrinking until it fits rather than trusting a characters-per-token estimate.
      */
-    private fun hardSplit(text: String): List<ChunkPiece> {
-        val pieces = mutableListOf<ChunkPiece>()
-        var remaining = text
-        var separator = " "
-        while (remaining.isNotEmpty()) {
-            var candidate = cutAt(remaining, minOf(remaining.length, budgetTokens * ESTIMATED_CHARS_PER_TOKEN))
-            while (!fits(candidate) && candidate.length > 1) {
-                candidate = cutAt(remaining, candidate.length / 2)
+    private fun hardSplit(
+        content: String,
+        from: Int,
+        to: Int,
+        spans: MutableList<ChunkSpan>,
+    ) {
+        var start = from
+        while (start < to) {
+            // Whitespace at a cut is left between the spans, so it reappears as the next piece's
+            // separator instead of on either piece.
+            while (start < to && content[start].isWhitespace()) start++
+            if (start >= to) return
+
+            var end = cut(content, start, minOf(to, start + budgetTokens * ESTIMATED_CHARS_PER_TOKEN), to)
+            while (!fits(content.substring(start, end)) && end - start > 1) {
+                end = cut(content, start, start + (end - start) / 2, to)
             }
-            val piece = candidate.trim()
-            if (piece.isNotEmpty()) pieces += ChunkPiece(piece, separator, tokenizer.count(piece))
-            val rest = remaining.substring(candidate.length)
-            // Only rejoin with a space where the source had whitespace; a cut made mid-token must
-            // not gain a separator it never had.
-            separator = if (rest.firstOrNull()?.isWhitespace() == true) " " else ""
-            remaining = rest.trimStart()
+            val piece = trimmedEnd(content, start, end)
+            if (piece > start) spans += ChunkSpan(start, piece)
+            start = end
         }
-        return pieces
     }
 
-    /** Cuts at [end], backing up to the previous space when that does not lose most of the piece. */
-    private fun cutAt(
-        text: String,
+    /**
+     * Cuts at [end], backing up to the previous space when that does not lose most of the piece.
+     * Always returns past [start], so the caller cannot fail to make progress: without that, an
+     * astral character sitting exactly on the cut would make the loop stand still forever.
+     */
+    private fun cut(
+        content: String,
+        start: Int,
         end: Int,
-    ): String {
-        if (end >= text.length) return text
-        val space = text.lastIndexOf(' ', end)
-        return if (space > end / 2) text.substring(0, space) else text.substring(0, end)
+        limit: Int,
+    ): Int {
+        if (end >= limit) return limit
+        val space = content.lastIndexOf(' ', end)
+        if (space > start + (end - start) / 2) return space
+        val whole = content.wholeCharacterEnd(end)
+        return if (whole > start) whole else minOf(limit, start + 2)
+    }
+
+    /** [end] pulled back over trailing whitespace, which belongs to the gap and not to the piece. */
+    private fun trimmedEnd(
+        content: String,
+        start: Int,
+        end: Int,
+    ): Int {
+        var trimmed = end
+        while (trimmed > start && content[trimmed - 1].isWhitespace()) trimmed--
+        return trimmed
     }
 }

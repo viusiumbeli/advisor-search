@@ -69,14 +69,53 @@ fusion has to be a union — an inner join would have silently deleted the task'
 
 **Semantic.** Documents are chunked to ~200 wordpieces with ~30 of overlap, each chunk is embedded
 with `all-MiniLM-L6-v2` running on ONNX Runtime in-process, and stored as `vector(384)`. Search
-takes the globally nearest chunks and collapses them to one best chunk per document:
+reduces the corpus to one row per document — its own nearest chunk, which is both that document's
+score and its snippet — and shortlists the best 30 of those:
 
 ```sql
-SELECT DISTINCT ON (top.document_id) …, 1 - (top.embedding <=> CAST(:vector AS vector)) AS score
-FROM (SELECT … FROM document_chunks ORDER BY embedding <=> CAST(:vector AS vector) LIMIT 50) top
-JOIN documents d ON d.id = top.document_id
-ORDER BY top.document_id, top.embedding <=> CAST(:vector AS vector);
+WITH best AS (
+    SELECT document_id, min(embedding <=> CAST(:vector AS vector)) AS distance
+    FROM document_chunks GROUP BY document_id
+    ORDER BY distance LIMIT 30)
+SELECT d.id, …, nearest.content AS snippet, 1 - best.distance AS score
+FROM best JOIN documents d ON d.id = best.document_id
+JOIN LATERAL (SELECT content FROM document_chunks WHERE document_id = best.document_id
+              ORDER BY embedding <=> CAST(:vector AS vector), id LIMIT 1) nearest ON true
+ORDER BY best.distance, d.id;
 ```
+
+**The shortlist is counted in documents, and that is the whole point of the reduction.** Taking the
+50 nearest chunks and collapsing them to one per document afterwards reads as equivalent and is not.
+The seeded reports run to 22 chunks each, so two or three of them fill a chunk-shaped window, and
+what does not fit is not ranked low — it is not ranked at all. The documents most easily squeezed
+out are the short ones, and the electricity bill this page is largely about is three chunks long.
+The failure is invisible from the outside, which is the argument for not writing it that way:
+nothing distinguishes "no good match" from "never looked". Both arms are therefore cut to the same
+depth in the same unit, since fusion combines them as rankings — the semantic arm applies the number
+once per expansion probe and then keeps each document's best score, so an expanded query carries
+more than 30 into the floors. `DocumentSearchRepositoryTest` pins the semantics.
+
+The formulation matters as much as the semantics, and it is not obvious which way. Three ways to
+write "one row per document", timed with `EXPLAIN ANALYZE`, median of five warm runs on the seeded
+corpus and on the same corpus grown to the large scale of [load and limits](load-and-limits.md):
+
+| Formulation | 153 chunks | 99,700 chunks |
+| --- | --- | --- |
+| Nearest 50 chunks, collapsed afterwards — bounded by chunks, so it starves | 0.87 ms | 100 ms |
+| `DISTINCT ON (document_id)` over the whole table | 0.73 ms | 424 ms |
+| `min()` per document, text fetched for the survivors — shipped | 0.85 ms | 244 ms |
+
+At the corpus that ships, all three are the same query. At the large corpus `DISTINCT ON` is the one
+that is genuinely more expensive: it sorts every chunk in the corpus, where `min()` groups them
+through a hash table and only the thirty survivors ever pay for their text. (A `CROSS JOIN LATERAL`
+per document — the shape that reads most naturally — was measured too, and is the worst of the four
+at 1.1 s: a nested loop over every document, each with its own index scan and sort.)
+
+The remaining gap to the chunk-bounded query is not extra work. With
+`max_parallel_workers_per_gather = 0` the shipped query runs in 182 ms and the chunk-bounded one in
+176 ms — the difference is that a top-N heap hands itself to two parallel workers and a hash
+aggregate does not. Every chunk is scored either way: the scan is exact, not approximate, and what
+changes is only what is ranked afterwards.
 
 The pipeline reproduces the checkpoint's published behaviour exactly: mean pooling over unmasked
 tokens, then L2 normalisation. Because the stored vectors are unit length, `1 - (a <=> b)` is

@@ -1,5 +1,6 @@
 package com.advisorsearch.documents
 
+import com.advisorsearch.support.trimmedOrReject
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import java.time.OffsetDateTime
@@ -28,7 +29,11 @@ data class NewDocument(
     val content: String,
 )
 
-fun CreateDocumentRequest.toNewDocument(): NewDocument = NewDocument(title = title!!.trim(), content = content!!.trim())
+fun CreateDocumentRequest.toNewDocument(): NewDocument =
+    NewDocument(
+        title = title!!.trimmedOrReject("title"),
+        content = content!!.trimmedOrReject("content"),
+    )
 
 /** Extractive summary: the chunks nearest the document's own centroid, in reading order. */
 data class DocumentSummary(

@@ -6,3 +6,9 @@ internal data class ChunkPiece(
     val separator: String,
     val tokens: Int,
 )
+
+/** Half-open `[start, end)` over the document, which is how the chunker decides where pieces are. */
+internal data class ChunkSpan(
+    val start: Int,
+    val end: Int,
+)

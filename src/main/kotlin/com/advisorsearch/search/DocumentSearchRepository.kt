@@ -55,35 +55,54 @@ class DocumentSearchRepository(
             .list()
 
     /**
-     * The semantic arm. The inner query takes the globally nearest chunks and `DISTINCT ON` keeps each
-     * document's best one, which is both its score and its snippet. The scan is exact, not approximate
-     * — see docs/operating-notes.md, "There is deliberately no ANN index".
+     * The semantic arm. Every document is scored by its own nearest chunk, and the best
+     * [candidateDocuments] of *those* are shortlisted — so the shortlist is bounded by documents: the
+     * unit the lexical arm is bounded by, and the unit fusion ranks in.
+     *
+     * Bounding it by chunks instead is the subtle version of this query, and what it costs is recall
+     * that never shows up as an error. The seeded reports run to 22 chunks each, so two or three of
+     * them fill a 50-chunk window; whatever does not fit is not ranked low, it is not ranked at all,
+     * and the documents most easily squeezed out are the short ones — the electricity bill the
+     * brief's own example turns on is three chunks long.
+     *
+     * Written as an aggregate rather than the `DISTINCT ON` that reads more naturally, because
+     * `min()` groups through a hash table while `DISTINCT ON` has to sort every chunk in the corpus:
+     * 234 ms against 417 ms at 99,700 chunks. Only the thirty survivors then pay for their text.
+     * The measurements are in docs/search-design.md.
+     *
+     * The scan stays exact rather than approximate — see docs/operating-notes.md, "There is
+     * deliberately no ANN index".
      */
     fun semanticSearch(
         queryVector: FloatArray,
-        candidateChunks: Int,
+        candidateDocuments: Int,
     ): List<DocumentMatch> =
         jdbc
             .sql(
                 """
-                SELECT DISTINCT ON (top.document_id)
-                       top.document_id AS id, d.client_id, d.title, d.created_at,
-                       top.content AS snippet,
-                       1 - (top.embedding <=> CAST(:vector AS vector)) AS score
-                FROM (
-                    SELECT document_id, content, embedding
+                WITH best AS (
+                    SELECT document_id, min(embedding <=> CAST(:vector AS vector)) AS distance
                     FROM document_chunks
-                    ORDER BY embedding <=> CAST(:vector AS vector)
+                    GROUP BY document_id
+                    ORDER BY distance
                     LIMIT :candidates
-                ) top
-                JOIN documents d ON d.id = top.document_id
-                ORDER BY top.document_id, top.embedding <=> CAST(:vector AS vector)
+                )
+                SELECT d.id, d.client_id, d.title, d.created_at,
+                       nearest.content AS snippet,
+                       1 - best.distance AS score
+                FROM best
+                JOIN documents d ON d.id = best.document_id
+                JOIN LATERAL (
+                    SELECT content
+                    FROM document_chunks
+                    WHERE document_id = best.document_id
+                    ORDER BY embedding <=> CAST(:vector AS vector), id
+                    LIMIT 1
+                ) nearest ON true
+                ORDER BY best.distance, d.id
                 """.trimIndent(),
             ).param("vector", queryVector.toVectorLiteral())
-            .param("candidates", candidateChunks)
+            .param("candidates", candidateDocuments)
             .query(documentMatchRowMapper)
             .list()
-            // DISTINCT ON has to lead with the grouping column, so the rows come back ordered by
-            // document id. Relevance order is restored here.
-            .sortedWith(compareByDescending<DocumentMatch> { it.score }.thenBy { it.reference.id })
 }

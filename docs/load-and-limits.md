@@ -46,20 +46,34 @@ rises (39 to 188 req/s at seed scale) while per-request latency stretches, which
 inference-bound CPU rather than lock contention — the same fact that keeps virtual threads off
 (see [Runtime and data-access choices](operating-notes.md#runtime-and-data-access-choices)).
 
+One caveat on the last two rows. They were measured before the semantic arm was changed to shortlist
+documents rather than chunks ([search design](search-design.md#documents-two-retrievers)), and the
+arm's own cost at that scale went from 100 ms to 244 ms per query, which lands on top of them. At
+the corpus that ships the change is not visible: running both versions side by side on one machine,
+three rounds of 200 requests each, put them at 16–17 ms against 18–20 ms p50 at concurrency 1 — the
+gap being about the difference between a JVM up for hours and one just started — and inside each
+other's spread at 20 (69–72 ms against 67–79 ms). The large corpus is where it costs, and that is
+the same thing these rows already say: past the crossover the exact scan is the wrong tool, and the
+answer is the index rather than a cheaper way to be wrong.
+
 ## Ingest under load
 
 | Scenario | Result |
 | --- | --- |
 | One 10 KB document (the brief's average size), seed corpus | 269 ms, 10 chunks |
 | Five 10 KB documents concurrently | per-request p50 710 ms, max 741 ms; 6.3 docs/s aggregate |
-| One 99 KB document (just under the cap) | 1.7 s, 95 chunks |
+| One 99 KB document (just under the cap) | 2.3 s, 95 chunks |
 | Search while that 99 KB ingest runs (200 requests, concurrency 10) | p50 42 ms, p95 93 ms — from p50 33 ms, p95 71 ms idle |
 | One 10 KB document again, at the large corpus | 335 ms — ingest cost is model inference, not corpus size |
 
 Ingest cost is a function of document size, not corpus size — the same 10 KB document costs about
-the same at 153 chunks as at 99,700. Five concurrent ingests triple per-request latency for the
+the same at 153 chunks as at 99,700. A maximum-size document is the one row that moved: chunks are
+encoded sixteen at a time rather than as one padded batch, which costs roughly 0.6 s on 95 chunks
+and buys a peak native-memory ceiling that no longer scales with document length times concurrent
+ingests (the rationale is on `EMBED_BATCH` in `EmbeddingService`). Documents at the corpus's average
+size are a single batch either way. Five concurrent ingests triple per-request latency for the
 same reason five concurrent searches stretch search: they queue for the same cores. A
-maximum-size document is 1.7 s of synchronous work, which is what a caller's timeout has to be
+maximum-size document is 2.3 s of synchronous work, which is what a caller's timeout has to be
 sized for; the criterion for moving ingest behind a background job (p99 over 5 s) is in
 [Operating notes](operating-notes.md#ingest-is-synchronous). On this 12-core machine one background
 ingest lifts search p95 by about a third (71 to 93 ms); on the deploy's four shared vCPUs the same
@@ -78,14 +92,16 @@ The ceilings the system runs against, and what happens at each:
 | tsvector positions | 16,383 per document | Silent: past ~16,000 words every further word reads back as position 16,383, and `ts_rank_cd` is cover density — positional by definition — so lexical ranking inputs quietly degrade. 100,000 characters ≈ 16,000 English words: the cap sits on this boundary (confirmed by measurement after the number was chosen, not the reason for it). |
 | Encoder window | 256 wordpieces | Silent truncation — prevented per chunk by the chunker's hard-window fallback. |
 | Exact vector scan | ~50,000 chunks | The crossover to the [HNSW index](operating-notes.md#there-is-deliberately-no-ann-index); the large-corpus search rows show why. |
-| Synchronous ingest | 5 s p99 | Move ingest behind a background job; at the cap a document costs 1.7 s. |
+| Synchronous ingest | 5 s p99 | Move ingest behind a background job; at the cap a document costs 2.3 s. |
 | Machine memory | 2 GB floor | JVM plus ONNX Runtime's native arenas; 256 MB OOMs, and the api container settles between 760 and 840 MB resident. Sized for in [Deploying it](../README.md#deploying-it). |
 
 The 100,000-character cap itself is provenance plus headroom: the brief's clarification put the
 average document at about 10 KB, so the cap is 10× the stated corpus while staying under both
-tsvector ceilings. Its known weakness is that one number carries two meanings — the `CHECK` is
-pinned to the same 100,000 as `ingest.max-content-length`, so raising only the property would
-turn clean 400s into database constraint violations. The named split, if documents ever
+tsvector ceilings. One number carrying two meanings is the awkward part — the `CHECK` is pinned to
+the same 100,000 as `ingest.max-content-length`, and raising only the property would turn clean
+400s into database constraint violations. So it cannot be raised alone: the property is bounded by
+the same ceiling in `IngestProperties`, and a larger value fails startup rather than the first
+oversized request. The named split, if documents ever
 legitimately grow past this (a full prospectus or annual report does): the `CHECK` becomes a
 physical rail at 500,000 — under the tsvector break point with margin — while the property stays
 the product policy, always at or below the rail; past ~16,000 words the lexical arm changes too

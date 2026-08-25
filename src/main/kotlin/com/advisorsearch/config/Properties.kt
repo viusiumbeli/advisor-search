@@ -2,6 +2,7 @@ package com.advisorsearch.config
 
 import jakarta.validation.constraints.DecimalMax
 import jakarta.validation.constraints.DecimalMin
+import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Positive
 import jakarta.validation.constraints.PositiveOrZero
@@ -35,14 +36,22 @@ data class SearchProperties(
     @field:DecimalMin("0.0") @field:DecimalMax("1.0") val wordSimilarityThreshold: Double,
     @field:Positive val minFuzzyQueryLength: Int,
     @field:Positive val candidateDocuments: Int,
-    @field:Positive val candidateChunks: Int,
     @field:Positive val rrfK: Int,
 )
+
+/** The `documents_content_length` CHECK in V1__initial_schema.sql. */
+private const val CONTENT_LENGTH_CEILING = 100_000L
 
 @Validated
 @ConfigurationProperties(prefix = "ingest")
 data class IngestProperties(
-    @field:Positive val maxContentLength: Int,
+    /**
+     * Bounded above by the schema's own ceiling, which the migration says this must never exceed.
+     * Raising it past that would let a document pay for chunking and inference and then die on a
+     * CHECK constraint — an opaque 500 in place of the 400 that names the limit. A misconfiguration
+     * this cheap to state should fail the instance, not the request.
+     */
+    @field:Positive @field:Max(CONTENT_LENGTH_CEILING) val maxContentLength: Int,
 )
 
 @ConfigurationProperties(prefix = "api")

@@ -2,6 +2,7 @@ package com.advisorsearch.embedding
 
 import com.advisorsearch.config.EmbeddingProperties
 import com.advisorsearch.support.WHITESPACE_RUN
+import com.advisorsearch.support.wholeCharacterEnd
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
@@ -9,6 +10,15 @@ private val log = LoggerFactory.getLogger(EmbeddingService::class.java)
 
 /** Leaves the encoder window comfortably clear for a full-size chunk plus [CLS]/[SEP]. */
 private const val TITLE_TOKEN_BUDGET = 20
+
+/**
+ * How many chunks are padded into one ONNX call. Self-attention allocates on the order of
+ * batch × heads × sequence² of native memory, outside the heap and outside `MaxRAMPercentage`, so
+ * an uncapped batch makes peak memory a function of document length times concurrent ingests. A
+ * document at the 100,000-character cap is ~150 chunks; batching them in sixteens costs a few
+ * milliseconds of extra call overhead and keeps the peak flat.
+ */
+private const val EMBED_BATCH = 16
 
 /**
  * The one embedding path used by both indexing and querying. Sharing it is what makes the two
@@ -35,10 +45,10 @@ class EmbeddingService(
     fun embedQueries(queries: List<String>): List<FloatArray> = embedder.embedAll(queries)
 
     /**
-     * Embeds a document's chunks in one batched call, each with the document title prepended. A chunk
-     * from the middle of a long document often has no idea what it is about ("the amount due is
-     * payable within 14 days"); the title carries that into the vector at no storage cost, because
-     * only the raw chunk text is persisted.
+     * Embeds a document's chunks in padded calls of [EMBED_BATCH], each chunk with the document title
+     * prepended. A chunk from the middle of a long document often has no idea what it is about ("the
+     * amount due is payable within 14 days"); the title carries that into the vector at no storage
+     * cost, because only the raw chunk text is persisted.
      */
     fun embedChunks(
         title: String,
@@ -46,7 +56,7 @@ class EmbeddingService(
     ): List<FloatArray> {
         if (chunks.isEmpty()) return emptyList()
         val prefix = titlePrefix(title)
-        return embedder.embedAll(chunks.map { prefix + it })
+        return chunks.chunked(EMBED_BATCH).flatMap { batch -> embedder.embedAll(batch.map { prefix + it }) }
     }
 
     private fun titlePrefix(title: String): String {
@@ -66,7 +76,15 @@ class EmbeddingService(
             val candidate = words.take(kept).joinToString(" ")
             if (tokenizer.count(candidate) <= budget) return candidate
         }
-        return words.first()
+        // One word can exceed the budget on its own: WordPiece splits on punctuation too, so a
+        // title that is a long filename or URL has no space to cut at and tokenizes into dozens of
+        // pieces. Returning it whole would push the prefix past the encoder window and truncate the
+        // chunk it was meant to describe, so the last resort halves characters until it measures.
+        var candidate = words.first()
+        while (tokenizer.count(candidate) > budget && candidate.length > 1) {
+            candidate = candidate.substring(0, candidate.wholeCharacterEnd(candidate.length / 2))
+        }
+        return candidate
     }
 
     init {

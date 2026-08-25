@@ -235,6 +235,18 @@ let keyRequired = false;
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+// An href is an execution sink, and esc() escapes HTML metacharacters rather than URL schemes: a
+// stored "javascript:…" link passes through it unchanged and runs on click. Only an absolute http(s)
+// URL becomes a link — parsing without a base also rejects "//host/x" and bare text, which would
+// otherwise resolve against this page and point a client's "social link" at the console itself.
+// Anything else is shown as plain text.
+function safeUrl(value) {
+  try {
+    const url = new URL(String(value));
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch { return null; }
+}
+
 // Highlights each query term inside already-escaped text.
 function highlight(text, query) {
   let out = esc(text);
@@ -254,6 +266,13 @@ function updateKeyState() {
   else { keyState.textContent = "key required"; keyState.classList.add("locked"); }
 }
 
+// Current browsers make showModal() on an already-modal dialog a no-op, but older ones throw
+// InvalidStateError, and two requests can 401 together — the document panel fetches a document and
+// its summary at once.
+function promptForKey() {
+  if (!keyDialog.open) keyDialog.showModal();
+}
+
 // One fetch for every API call: attaches the key, and turns a 401 into a re-prompt.
 async function api(path, options = {}) {
   const headers = Object.assign({}, options.headers);
@@ -263,7 +282,7 @@ async function api(path, options = {}) {
     keyRequired = true;
     setKey("");
     updateKeyState();
-    keyDialog.showModal();
+    promptForKey();
     throw new Error("unauthorized");
   }
   return response;
@@ -278,7 +297,10 @@ async function problemMessage(response) {
 
 function clientCard(hit) {
   const c = hit.client;
-  const links = (c.social_links || []).map((l) => `<a href="${esc(l)}" rel="noopener">${esc(l)}</a>`).join(" · ");
+  const links = (c.social_links || []).map((l) => {
+    const href = safeUrl(l);
+    return href ? `<a href="${esc(href)}" rel="noopener">${esc(l)}</a>` : esc(l);
+  }).join(" · ");
   return `<div class="card">
     <div class="card-head">
       <span class="card-title">${esc(c.first_name)} ${esc(c.last_name)}</span>
@@ -427,11 +449,20 @@ $("#document-form").addEventListener("submit", async (event) => {
   const form = event.target, note = $("#document-form-note");
   clearFieldErrors(form);
   // The API is addressed by client id; the form asks for the email and resolves it via search.
+  // Several clients can match an address as a substring, and an exact match does not always sort
+  // first among them, so this asks for a page rather than a single hit and picks the exact one.
   const email = form.client.value.trim();
   let found = [];
   try {
-    const response = await api(`/search?q=${encodeURIComponent(email)}&limit=1`);
-    if (response.ok) found = await response.json();
+    const response = await api(`/search?q=${encodeURIComponent(email)}&limit=10`);
+    // A failed lookup is not an absent client: reporting "Client not found" for a 503 from a
+    // still-starting instance would send the reader after the wrong problem.
+    if (!response.ok) {
+      note.className = "form-note bad";
+      note.textContent = await problemMessage(response);
+      return;
+    }
+    found = await response.json();
   } catch (e) {
     if (e.message !== "unauthorized") { note.className = "form-note bad"; note.textContent = e.message; }
     return;
@@ -472,12 +503,19 @@ $("#key-form").addEventListener("submit", () => {
   updateKeyState();
 });
 
-// On load: one cheap probe decides whether this instance wants a key.
+// On load: one cheap probe decides whether this instance wants a key, and it is sent *without* the
+// stored key on purpose. Sending the key would answer a different question — a valid one returns
+// 200, and the header would then report a protected instance as "no key needed".
 (async () => {
   try {
-    const response = await fetch("/search?q=ping&limit=1", getKey() ? { headers: { "X-API-Key": getKey() } } : {});
-    keyRequired = response.status === 401;
-    if (keyRequired && !getKey()) keyDialog.showModal();
+    keyRequired = (await fetch("/search?q=ping&limit=1")).status === 401;
+    // Only now is the stored key worth checking. A key kept from an earlier session can be the
+    // wrong one, and leaving it in place would show "key set" for a key that unlocks nothing.
+    if (keyRequired && getKey()) {
+      const check = await fetch("/search?q=ping&limit=1", { headers: { "X-API-Key": getKey() } });
+      if (check.status === 401) setKey("");
+    }
+    if (keyRequired && !getKey()) promptForKey();
   } catch { /* offline; searching will surface the error */ }
   updateKeyState();
 })();
