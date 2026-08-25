@@ -6,8 +6,6 @@ import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
-import org.springframework.http.MediaType
-import org.springframework.http.ProblemDetail
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 import tools.jackson.databind.ObjectMapper
@@ -16,13 +14,6 @@ import java.security.MessageDigest
 private val log = LoggerFactory.getLogger(ApiKeyFilter::class.java)
 
 private const val HEADER = "X-API-Key"
-
-/**
- * Health probes stay open for the orchestrator, the API documentation and the console page for the
- * reviewer. The page itself holds no data — everything it fetches still goes through this filter.
- */
-private val PUBLIC_PREFIXES = listOf("/actuator/", "/swagger-ui/", "/v3/api-docs")
-private val PUBLIC_PATHS = listOf("/swagger-ui.html", "/", "/index.html")
 
 /**
  * Shared-secret header check for the deployed instance. An empty `api.key` — the compose default —
@@ -45,11 +36,7 @@ class ApiKeyFilter(
         log.info(if (enabled) "API key authentication is enabled" else "API key authentication is disabled")
     }
 
-    override fun shouldNotFilter(request: HttpServletRequest): Boolean {
-        if (!enabled) return true
-        val path = request.requestURI
-        return path in PUBLIC_PATHS || PUBLIC_PREFIXES.any(path::startsWith)
-    }
+    override fun shouldNotFilter(request: HttpServletRequest): Boolean = !enabled || request.isPublicSurface()
 
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -58,16 +45,8 @@ class ApiKeyFilter(
     ) {
         val presented = request.getHeader(HEADER)
         if (presented == null || !MessageDigest.isEqual(sha256(presented), expectedDigest)) {
-            response.status = HttpStatus.UNAUTHORIZED.value()
-            response.contentType = MediaType.APPLICATION_PROBLEM_JSON_VALUE
-            response.characterEncoding = Charsets.UTF_8.name()
             response.setHeader(HttpHeaders.WWW_AUTHENTICATE, HEADER)
-            objectMapper.writeValue(
-                response.outputStream,
-                ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Provide a valid $HEADER header.").apply {
-                    title = "Unauthorized"
-                },
-            )
+            response.sendProblem(objectMapper, HttpStatus.UNAUTHORIZED, "Unauthorized", "Provide a valid $HEADER header.")
             return
         }
         filterChain.doFilter(request, response)

@@ -86,7 +86,7 @@ class SearchService(
         val best =
             embeddings
                 .embedQueries(expander.expand(query))
-                .flatMap { vector -> documents.semanticSearch(vector, properties.candidateChunks) }
+                .flatMap { vector -> documents.semanticSearch(vector, properties.candidateDocuments) }
                 .bestByDocument()
 
         // Both floors apply here, while the numbers are still cosine similarities: after fusion

@@ -1,5 +1,6 @@
 package com.advisorsearch.clients
 
+import com.advisorsearch.support.trimmedOrReject
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
@@ -50,9 +51,9 @@ data class NewClient(
 
 fun CreateClientRequest.toNewClient(): NewClient =
     NewClient(
-        firstName = firstName!!.trim(),
-        lastName = lastName!!.trim(),
-        email = email!!.trim(),
+        firstName = firstName!!.trimmedOrReject("first_name"),
+        lastName = lastName!!.trimmedOrReject("last_name"),
+        email = email!!.trimmedOrReject("email"),
         description = description?.trim()?.ifEmpty { null },
         socialLinks = socialLinks,
     )

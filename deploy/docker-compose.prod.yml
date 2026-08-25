@@ -13,7 +13,13 @@
 #   7. No seed profile: the reviewer posts his own data, so the instance starts and stays empty.
 #      The dev compose seeds a demo corpus by default.
 #
-# No compose healthcheck on api: the image declares its own. The db one stays for depends_on.
+# Both secrets are interpolated with `:?`, so a missing or mis-sourced .env stops compose with a
+# named variable rather than starting the stack. That matters most for API_KEY: an empty key is how
+# the filter is switched off locally, so substituting one here would serve client records to the
+# internet unauthenticated — the failure would look like a working deployment.
+#
+# No compose healthcheck on api: the image declares its own, which is what caddy's depends_on
+# condition reads. The db one stays for api's own depends_on.
 
 services:
   db:
@@ -21,7 +27,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: advisor
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?generate it into the .env beside this file, as in docs/operating-notes.md}"
       POSTGRES_DB: advisor_search
     volumes:
       - pgdata:/var/lib/postgresql
@@ -40,15 +46,20 @@ services:
     environment:
       DB_URL: jdbc:postgresql://db:5432/advisor_search
       DB_USERNAME: advisor
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_PASSWORD: "${POSTGRES_PASSWORD:?generate it into the .env beside this file, as in docs/operating-notes.md}"
       LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
-      API_KEY: ${API_KEY}
+      API_KEY: "${API_KEY:?an empty key disables authentication; generate it into the .env beside this file}"
 
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
     depends_on:
-      - api
+      # Healthy, not merely started: readiness covers the model check and the embedding warmup, so
+      # on bring-up the public address waits rather than proxying to an instance that is not
+      # serving yet. It orders `compose up` only — once both are running, the app's own readiness
+      # filter is what answers 503 during a restart.
+      api:
+        condition: service_healthy
     ports:
       - "80:80"
       - "443:443"

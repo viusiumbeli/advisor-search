@@ -9,11 +9,19 @@ import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Transactional for the reason given on SchemaConstraintTest. It matters most here: the forty
+ * paragraphs of filler below embed into a document that outscores real ones, and the semantic floor
+ * is relative, so leaving it behind does not merely add a row to another class's results — it can
+ * lift the cut-off past the document that class is asserting on.
+ */
+@Transactional
 class DocumentApiTest(
     private val mockMvc: MockMvc,
     private val jdbc: JdbcClient,
@@ -54,6 +62,27 @@ class DocumentApiTest(
     }
 
     @Test
+    fun `a title of Unicode whitespace is rejected before anything is embedded`() {
+        val clientId = createClient()
+        val before = chunkCount()
+
+        // A non-breaking space satisfies @NotBlank, whose trim() strips only characters up to
+        // U+0020, and is then trimmed away on the way to the insert. Left to the database this is a
+        // CHECK violation — a 500, paid for after chunking and inference.
+        mockMvc
+            .post("/clients/$clientId/documents") {
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapperContent("\u00A0", "Content that is perfectly fine.")
+            }.andExpect {
+                status { isBadRequest() }
+                content { contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON) }
+                jsonPath("$.detail") { value(containsString("title")) }
+            }
+
+        assertEquals(before, chunkCount(), "a rejected document must not cost any model inference")
+    }
+
+    @Test
     fun `a document is searchable as soon as it is created`() {
         val clientId = createClient()
         val marker = "Hallowfield ${UUID.randomUUID().toString().take(8)}"
@@ -74,7 +103,8 @@ class DocumentApiTest(
                 .response
                 .getHeader("Location")!!
 
-        // No indexing delay to wait out: the 201 already means chunked, embedded and committed.
+        // No indexing delay to wait out: the 201 already means chunked and embedded, and the search
+        // below reads it back through the same transaction that wrote it.
         mockMvc.get("/search") { param("q", marker) }.andExpect {
             status { isOk() }
             jsonPath("$[?(@.type == 'document')].document.title") {

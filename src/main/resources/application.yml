@@ -66,13 +66,18 @@ search:
   # Queries shorter than this (in alphanumeric characters) skip the fuzzy arm: trigram similarity
   # over one or two characters is noise.
   min-fuzzy-query-length: 3
+  # How many documents each arm shortlists before fusion — documents in both arms, so the two
+  # rankings fusion combines are cut to the same depth. The semantic arm applies it per expansion
+  # probe and then keeps each document's best score, so an expanded query can carry more than this
+  # into the floors below; what it cannot do is let one long document consume the shortlist.
   candidate-documents: 30
-  candidate-chunks: 50
   # Reciprocal rank fusion constant from Cormack et al., SIGIR 2009; also the default in
   # Elasticsearch, OpenSearch and Azure AI Search.
   rrf-k: 60
 
 ingest:
+  # The schema carries the same ceiling as a CHECK constraint, and startup rejects a larger value
+  # here rather than letting an ingest fail at the insert.
   max-content-length: 100000
 
 api:
