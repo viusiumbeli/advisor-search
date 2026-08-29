@@ -43,16 +43,29 @@ class DocumentService(
 
         val chunks = embeddings.chunk(newDocument.content)
         val (vectors, embedTime) = measureTimedValue { embeddings.embedChunks(newDocument.title, chunks) }
+        // Sequential, not concurrent: each ONNX session already spreads a batch over every core, so
+        // running the two passes side by side would only oversubscribe them.
+        val (sparseVectors, sparseTime) = measureTimedValue { embeddings.encodeChunksSparsely(newDocument.title, chunks) }
 
         val document =
-            documents.insertWithChunks(clientId, newDocument.title, newDocument.content, chunks, vectors, embeddings.modelId)
+            documents.insertWithChunks(
+                clientId,
+                newDocument.title,
+                newDocument.content,
+                chunks,
+                vectors,
+                embeddings.modelId,
+                sparseVectors,
+                embeddings.sparseModelId,
+            )
         log.info(
-            "Ingested document {} for client {}: {} characters, {} chunks, embedded in {}",
+            "Ingested document {} for client {}: {} characters, {} chunks, embedded in {}, sparse-encoded in {}",
             document.id,
             clientId,
             newDocument.content.length,
             chunks.size,
             embedTime,
+            sparseTime,
         )
         return document
     }

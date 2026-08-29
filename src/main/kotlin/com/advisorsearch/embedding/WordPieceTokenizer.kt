@@ -50,6 +50,9 @@ class WordPieceTokenizer(
         )
     }
 
+    /** The ids the encoder would see for [text] alone: specials included, truncated at [maxTokens]. */
+    fun tokenIds(text: String): LongArray = encoder.encode(text).ids
+
     /** True when [text] does not fit in [maxTokens] and the encoder would drop the tail. */
     fun exceedsWindow(text: String): Boolean = count(text) + SPECIAL_TOKENS > maxTokens
 

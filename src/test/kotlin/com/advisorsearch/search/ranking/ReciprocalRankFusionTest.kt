@@ -21,7 +21,7 @@ class ReciprocalRankFusionTest {
     }
 
     @Test
-    fun `a document found by both retrievers outranks one found by a single retriever`() {
+    fun `a document found by two retrievers outranks one found by a single retriever`() {
         val agreed = uuid(1)
         val keywordOnly = uuid(2)
 
@@ -41,6 +41,55 @@ class ReciprocalRankFusionTest {
         // worth more than being top of one list.
         assertClose(1.0 / 65 + 1.0 / 68, fused.first().score)
         assertClose(1.0 / 61, fused.single { it.id == keywordOnly }.score)
+    }
+
+    @Test
+    fun `three lists add up, so agreement between all three is worth the most`() {
+        val everywhere = uuid(1)
+        val twice = uuid(2)
+
+        val fused =
+            ReciprocalRankFusion
+                .fuse(
+                    listOf(
+                        RankedList("keyword", listOf(uuid(3), uuid(4), uuid(5), uuid(6), everywhere, twice)),
+                        RankedList("sparse", listOf(uuid(7), uuid(8), uuid(9), uuid(10), uuid(11), uuid(12), uuid(13), everywhere, twice)),
+                        RankedList(
+                            "semantic",
+                            listOf(uuid(14), uuid(15), uuid(16), uuid(17), uuid(18), uuid(19), uuid(20), uuid(21), uuid(22), everywhere),
+                        ),
+                    ),
+                    k,
+                ).associateBy { it.id }
+
+        assertClose(1.0 / 65 + 1.0 / 68 + 1.0 / 70, fused.getValue(everywhere).score)
+        assertClose(1.0 / 66 + 1.0 / 69, fused.getValue(twice).score)
+        assertEquals(setOf("keyword", "sparse", "semantic"), fused.getValue(everywhere).sources)
+    }
+
+    @Test
+    fun `two mediocre placings beat one first place, which is the behaviour a third list amplifies`() {
+        // Pinned deliberately: with a lexical and a learned-sparse list both rewarding literal
+        // tokens, a document at rank 10 in both (2/70) outscores a semantic-only first place (1/61).
+        // docs/search-design.md, "Fusion", names this as the trade the third arm makes.
+        val tenthTwice = uuid(1)
+        val firstOnce = uuid(2)
+        val filler = (3..11).map(::uuid)
+
+        val fused =
+            ReciprocalRankFusion
+                .fuse(
+                    listOf(
+                        RankedList("keyword", filler + tenthTwice),
+                        RankedList("sparse", filler + tenthTwice),
+                        RankedList("semantic", listOf(firstOnce)),
+                    ),
+                    k,
+                ).associateBy { it.id }
+
+        assertClose(2.0 / 70, fused.getValue(tenthTwice).score)
+        assertClose(1.0 / 61, fused.getValue(firstOnce).score)
+        assertTrue(fused.getValue(tenthTwice).score > fused.getValue(firstOnce).score)
     }
 
     @Test

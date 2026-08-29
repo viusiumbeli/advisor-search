@@ -111,7 +111,8 @@ class OnnxEmbedder(
     }
 }
 
-private fun flatten(rows: Array<LongArray>): LongArray {
+/** Row-major, the layout ONNX Runtime reads a 2-D tensor from; shared with [SparseEncoder]. */
+internal fun flatten(rows: Array<LongArray>): LongArray {
     val width = rows[0].size
     val flat = LongArray(rows.size * width)
     rows.forEachIndexed { index, row -> row.copyInto(flat, index * width) }

@@ -9,7 +9,9 @@
     "The association is procedural knowledge about which documents evidence what, so it is supplied",
     "explicitly here rather than hoped for from the model.",
     "Expansions widen the semantic arm only. The lexical arm exists to match exact tokens, and",
-    "OR-ing extra terms into it would cost precision for recall the semantic arm already provides."
+    "OR-ing extra terms into it would cost precision for recall the semantic arm already provides;",
+    "the sparse arm was measured with the probes and without and they changed no rank, only page",
+    "length. Its own learned expansion does not carry this case either: docs/search-design.md, \"Sparse\"."
   ],
   "rules": [
     {

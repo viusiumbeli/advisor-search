@@ -45,10 +45,28 @@ embedding:
   chunk-tokens: 200
   chunk-overlap-tokens: 30
 
+sparse:
+  model-path: ${SPARSE_MODEL_PATH:models/sparse-model.onnx}
+  # The checkpoint's own tokenizer, read for its vocabulary (the IDF table is keyed by token string)
+  # and asserted identical to embedding.tokenizer-path at startup — which is what lets one tokenizer
+  # and one chunker serve both models.
+  tokenizer-path: ${SPARSE_TOKENIZER_PATH:models/sparse-tokenizer.json}
+  # Query-side weights for the inference-free model: a query is its own wordpieces, each weighted
+  # from this table, so a search runs no second forward pass.
+  idf-path: ${SPARSE_IDF_PATH:models/sparse-idf.json}
+  # Recorded on every chunk row beside embedding.model-id and checked the same way at startup. The
+  # sparse floors under search are in this model's units and move with it.
+  model-id: opensearch-neural-sparse-encoding-doc-v2-mini
+  # Terms kept per chunk after pooling, heaviest first. On the seeded corpus a chunk activates 145 to
+  # 666 (median 278), so the default rarely binds; it exists because pgvector's HNSW index accepts at
+  # most 1,000 non-zeros per value, and a corpus that could never be indexed is a trap laid for later.
+  # The storage cap is 16,000, which is as high as this may be set.
+  max-terms: 1000
+
 search:
   default-limit: 10
   max-limit: 50
-  # The three floors below are measured, not picked. How, and on what:
+  # The five floors below are measured, not picked. How, and on what:
   # docs/search-design.md, "Calibrating the cut-offs".
   #
   # Absolute cosine floor. Answers "can the corpus answer this at all?" — nonsense peaks at 0.21 —
@@ -60,13 +78,22 @@ search:
   # Lexical floor, relative because ts_rank_cd has no absolute scale. Genuine secondary matches
   # score 0.50 to 0.58 of the best hit, incidental ones 0.03 and below; 0.05 sits in that gap.
   keyword-floor-ratio: 0.05
+  # Sparse floors, on the inner product divided by the query's own term mass — the IDF-weighted
+  # average weight the best chunk gives the query's terms. Inner products are unbounded and in the
+  # model's units, so unlike the cosine floor these move if sparse.model-id does. Absolute: nonsense
+  # peaks at 0.13 on this scale and the weakest genuine answer scores 0.18; 0.15 sits between.
+  # Relative: an incidental one-term overlap (the trust deed's "plc," against PLC-88213) is 0.32 of
+  # the real match, genuine secondary matches are 0.53 of the best and up; 0.45 sits in that gap.
+  # Both from SparseFloorTest's table.
+  sparse-floor: 0.15
+  sparse-floor-ratio: 0.45
 
   # pg_trgm's `<%` operator threshold, set per search transaction.
   word-similarity-threshold: 0.5
   # Queries shorter than this (in alphanumeric characters) skip the fuzzy arm: trigram similarity
   # over one or two characters is noise.
   min-fuzzy-query-length: 3
-  # How many documents each arm shortlists before fusion — documents in both arms, so the two
+  # How many documents each arm shortlists before fusion — documents in every arm, so the three
   # rankings fusion combines are cut to the same depth. The semantic arm applies it per expansion
   # probe and then keeps each document's best score, so an expanded query can carry more than this
   # into the floors below; what it cannot do is let one long document consume the shortlist.

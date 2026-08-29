@@ -1,4 +1,4 @@
-# The model is baked in at build time; nothing is fetched at container start, because ONNX Runtime
+# The models are baked in at build time; nothing is fetched at container start, because ONNX Runtime
 # and the tokenizer ship their native libraries inside their jars.
 #
 # The build stage is pinned to the builder's own architecture: its outputs are architecture
@@ -7,8 +7,8 @@
 FROM --platform=$BUILDPLATFORM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace
 
-# Dependencies and the model resolve from the build files alone, so editing source does not
-# re-download 90 MB of model or the Gradle distribution.
+# Dependencies and the models resolve from the build files alone, so editing source does not
+# re-download ~230 MB of models or the Gradle distribution.
 COPY gradle gradle
 COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY models/checksums.sha256 models/checksums.sha256

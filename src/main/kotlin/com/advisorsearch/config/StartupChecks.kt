@@ -11,7 +11,7 @@ import kotlin.time.measureTimedValue
 
 private val log = LoggerFactory.getLogger(StartupChecks::class.java)
 
-/** Two things are verified before the instance reports itself ready. */
+/** Both models are verified against the corpus and warmed before the instance reports itself ready. */
 @Component
 @Order(0)
 class StartupChecks(
@@ -20,6 +20,7 @@ class StartupChecks(
 ) : ApplicationRunner {
     override fun run(args: ApplicationArguments) {
         assertCorpusMatchesModel()
+        assertCorpusMatchesSparseModel()
         warmUp()
     }
 
@@ -37,12 +38,29 @@ class StartupChecks(
     }
 
     /**
+     * The same argument, sharper: term weights from two sparse checkpoints share a vocabulary axis,
+     * so a mixed corpus would not even look wrong — it would rank plausibly on a scale nobody set.
+     */
+    private fun assertCorpusMatchesSparseModel() {
+        val foreign = documents.distinctSparseModels().filter { it != embeddings.sparseModelId }
+        check(foreign.isEmpty()) {
+            "Corpus contains sparse vectors from ${foreign.joinToString()} but this instance is " +
+                "configured for ${embeddings.sparseModelId}. Reindex the documents or start with the " +
+                "matching model; mixing term-weight scales silently corrupts ranking."
+        }
+    }
+
+    /**
      * First inference allocates the ONNX arenas and pages in the native libraries. Paying that here
      * means no user request does, and a model that cannot run fails startup rather than a search.
+     * The sparse model is warmed with a document pass: its query side is a table lookup, and only a
+     * document pass allocates the vocabulary-wide arena the MLM head needs.
      */
     private fun warmUp() {
         val (vector, elapsed) = measureTimedValue { embeddings.embedQuery("warm up the embedding model") }
         check(vector.isNotEmpty()) { "Embedding model returned an empty vector" }
-        log.info("Embedding warmup completed in {}", elapsed)
+        val (sparse, sparseElapsed) = measureTimedValue { embeddings.encodeChunksSparsely("Warm up", listOf("warm up the sparse model")) }
+        check(sparse.single().termCount > 0) { "Sparse model returned an empty vector" }
+        log.info("Embedding warmup completed in {}, sparse warmup in {}", elapsed, sparseElapsed)
     }
 }

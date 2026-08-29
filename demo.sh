@@ -68,12 +68,12 @@ say "2. The task's document example: every document that can evidence an address
 say "   including the electricity bill, which contains neither word and is reached by meaning alone"
 run "GET /search?q=address%20proof"
 curl -s ${auth[@]+"${auth[@]}"} -G "$BASE_URL/search" --data-urlencode "q=address proof" --data-urlencode "limit=4" \
-  | pretty '[.[] | select(.type == "document") | {score, matched_on, title: .document.title}]'
+  | pretty '[.[] | select(.type == "document") | {score, matched_on, sources, title: .document.title}]'
 
-say "3. A rare exact token: embeddings treat it as noise, full text search does not"
+say "3. A rare exact token: embeddings treat it as noise; full text search and learned term weights do not"
 run "GET /search?q=PLC-88213"
 curl -s ${auth[@]+"${auth[@]}"} -G "$BASE_URL/search" --data-urlencode "q=PLC-88213" --data-urlencode "limit=2" \
-  | pretty '[.[] | select(.type == "document") | {score, matched_on, title: .document.title}]'
+  | pretty '[.[] | select(.type == "document") | {score, matched_on, sources, title: .document.title}]'
 
 say "4. A misspelled surname still finds the client"
 run "GET /search?q=Delacroix-Whitfeld"
@@ -84,7 +84,7 @@ say "5. A whole question, answered from a document that shares no vocabulary wit
 run "GET /search?q=who%20can%20act%20for%20a%20client%20if%20they%20lose%20capacity"
 curl -s ${auth[@]+"${auth[@]}"} -G "$BASE_URL/search" \
   --data-urlencode "q=who can act for a client if they lose capacity" --data-urlencode "limit=1" \
-  | top '{score, matched_on, title: .document.title, snippet: .snippet[0:120]}'
+  | top '{score, matched_on, sources, title: .document.title, snippet: .snippet[0:120]}'
 
 say "6. Creating a client, then a document, then finding it immediately"
 stamp=$(date +%H%M%S)
@@ -105,7 +105,7 @@ curl -s ${auth[@]+"${auth[@]}"} -X POST "$BASE_URL/clients/$client_id/documents"
 
 run "GET /search?q=building%20work%20estimate"
 curl -s ${auth[@]+"${auth[@]}"} -G "$BASE_URL/search" --data-urlencode "q=building work estimate" --data-urlencode "limit=2" \
-  | pretty '[.[] | select(.type == "document") | {score, matched_on, title: .document.title}]'
+  | pretty '[.[] | select(.type == "document") | {score, matched_on, sources, title: .document.title}]'
 
 say "7. Extractive summary of a long document"
 doc_id=$(curl -s ${auth[@]+"${auth[@]}"} -G "$BASE_URL/search" --data-urlencode "q=trustee duties" --data-urlencode "limit=5" \

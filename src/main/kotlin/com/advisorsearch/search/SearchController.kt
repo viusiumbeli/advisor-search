@@ -18,7 +18,9 @@ class SearchController(
         description =
             "Returns one array in two blocks: client hits first, then document hits. Scores are " +
                 "comparable within a block but not between blocks — client hits are trigram " +
-                "similarities in 0..1, document hits are reciprocal-rank-fusion weights.",
+                "similarities in 0..1, document hits are reciprocal-rank-fusion weights. For a " +
+                "document, matched_on is keyword, sparse or semantic, or multiple when more than one " +
+                "retriever agreed; sources lists which, most literal first.",
     )
     fun search(
         // Built-in method validation renders a blank q as a problem+json 400; a nullable limit is

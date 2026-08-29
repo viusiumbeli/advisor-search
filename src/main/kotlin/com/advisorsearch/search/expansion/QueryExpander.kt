@@ -13,11 +13,12 @@ private const val LEXICON = "search/query-expansions.json"
 private const val MAX_PROBES = 5
 
 /**
- * Supplies what a general-purpose embedding model does not know: which documents serve which purpose
- * in this domain. "Address proof finds a utility bill" is procedural knowledge, not similarity, so it
- * lives in a JSON lexicon a domain expert can edit without touching Kotlin. Expansion widens the
- * semantic arm only. The five-model measurement behind this is in docs/search-design.md, "Why the
- * task's own example needs more than a model".
+ * Supplies what a general-purpose model does not know: which documents serve which purpose in this
+ * domain. "Address proof finds a utility bill" is procedural knowledge, not similarity, so it lives
+ * in a JSON lexicon a domain expert can edit without touching Kotlin. Expansion widens the semantic
+ * arm only: the lexical arm's value is precision, and the sparse arm was measured with the probes
+ * and without — same ranks, longer pages. The measurements are in docs/search-design.md, "Why the
+ * task's own example needs more than a model" and "Sparse".
  */
 @Component
 class QueryExpander(

@@ -27,7 +27,8 @@ class SearchQualityTest(
             val hits = service.search(case.query, 10).filterIsInstance<DocumentHit>()
             val rank = hits.indexOfFirst { it.document.title.contains(case.expect, ignoreCase = true) } + 1
             if (rank in 1..HIT_AT) reciprocalRankSum += 1.0 / rank else misses += format(case, rank, hits.size)
-            println("%-46s rank %-3s %s".format("\"${case.query}\"", if (rank > 0) "$rank" else "-", case.expect))
+            val sources = hits.getOrNull(rank - 1)?.sources?.joinToString("+") ?: "-"
+            println("%-46s rank %-3s %-24s %s".format("\"${case.query}\"", if (rank > 0) "$rank" else "-", sources, case.expect))
         }
 
         println(

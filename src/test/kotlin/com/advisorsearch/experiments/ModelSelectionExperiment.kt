@@ -36,18 +36,6 @@ class ModelSelectionExperiment {
             CandidateModel("bge-small-en-v1.5", "bgesmall", Pooling.CLS, "Represent this sentence for searching relevant passages: "),
         )
 
-    private val probes =
-        listOf(
-            "address proof" to "electricity-account-statement",
-            "proof of address" to "electricity-account-statement",
-            "utility bill" to "electricity-account-statement",
-            "who can act for a client if they lose capacity" to "lasting-power-of-attorney",
-            "retirement income planning" to "suitability-report",
-            "inheritance tax on gifts" to "meeting-notes-estate-planning",
-            "share options vesting" to "share-option-scheme",
-            "rental yield" to "buy-to-let-portfolio-review",
-        )
-
     @Test
     @EnabledIfSystemProperty(named = "candidates", matches = ".+")
     fun `compare candidate models on the probe queries`() {
@@ -83,7 +71,7 @@ class ModelSelectionExperiment {
                 println("\n=== ${candidate.name} ===")
                 var hits = 0
                 var reciprocalRankSum = 0.0
-                probes.forEach { (query, expected) ->
+                PROBES.forEach { (query, expected) ->
                     val queryVector =
                         encode(
                             session,
@@ -114,7 +102,7 @@ class ModelSelectionExperiment {
                         ),
                     )
                 }
-                println("hit@5 = $hits/${probes.size}   MRR = %.3f".format(reciprocalRankSum / probes.size))
+                println("hit@5 = $hits/${PROBES.size}   MRR = %.3f".format(reciprocalRankSum / PROBES.size))
                 session.close()
             }
         }

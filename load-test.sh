@@ -86,7 +86,7 @@ ingest_one() { # <payload-file> -> echoes seconds
 }
 
 # One set-based generation pass per scale: copy the pristine seed documents (snapshotted below)
-# with fresh uuidv7 ids; chunks are copied with their embeddings, and the generated fts column
+# with fresh uuidv7 ids; chunks are copied with both their vectors, and the generated fts column
 # recomputes itself on insert. This is the same grow-by-copying methodology as the exact-scan and
 # 200k-clients measurements in docs/operating-notes.md.
 grow_documents() { # <from-gen> <to-gen>
@@ -97,8 +97,8 @@ CREATE TEMP TABLE m AS
 INSERT INTO documents (id, client_id, title, content, created_at)
   SELECT m.new_id, d.client_id, d.title || ' [copy ' || m.g || ']', d.content, d.created_at
   FROM m JOIN documents d ON d.id = m.old_id;
-INSERT INTO document_chunks (document_id, chunk_index, content, embedding, embedding_model)
-  SELECT m.new_id, c.chunk_index, c.content, c.embedding, c.embedding_model
+INSERT INTO document_chunks (document_id, chunk_index, content, embedding, embedding_model, sparse_embedding, sparse_model)
+  SELECT m.new_id, c.chunk_index, c.content, c.embedding, c.embedding_model, c.sparse_embedding, c.sparse_model
   FROM m JOIN document_chunks c ON c.document_id = m.old_id;
 SQL
 }

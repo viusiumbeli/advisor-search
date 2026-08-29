@@ -50,7 +50,7 @@ class ReadinessFilter(
             objectMapper,
             HttpStatus.SERVICE_UNAVAILABLE,
             "Not ready",
-            "The instance is still starting: the embedding model is being verified and warmed up. " +
+            "The instance is still starting: the embedding models are being verified and warmed up. " +
                 "Poll /actuator/health/readiness.",
         )
     }

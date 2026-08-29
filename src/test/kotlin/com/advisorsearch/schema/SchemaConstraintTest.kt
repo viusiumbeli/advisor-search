@@ -2,6 +2,7 @@ package com.advisorsearch.schema
 
 import com.advisorsearch.IntegrationTest
 import org.junit.jupiter.api.Test
+import org.springframework.dao.DataAccessException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.transaction.annotation.Transactional
@@ -81,6 +82,41 @@ class SchemaConstraintTest(
         assertEquals("7", versionNibble)
     }
 
+    @Test
+    fun `sparse vectors are typed to the vocabulary and stored one-based`() {
+        // pgvector sorts a literal's indices itself and re-emits them 1-based; an empty vector is legal.
+        assertEquals("{1:2,3:1}/5", scalar("SELECT CAST('{3:1,1:2}/5' AS sparsevec)::text"))
+        assertEquals("{}/30522", scalar("SELECT CAST('{}/30522' AS sparsevec)::text"))
+        // The negative inner product is what ORDER BY sorts on; 1.5*2 + 2*1 = 5.
+        assertEquals("-5", scalar("SELECT (CAST('{1:1.5,3:2}/5' AS sparsevec) <#> CAST('{1:2,3:1}/5' AS sparsevec))::text"))
+    }
+
+    // Three tests rather than one: an error aborts the surrounding transaction, so each probe needs its own.
+
+    @Test
+    fun `a sparse vector over another vocabulary is rejected by the column type`() {
+        val documentId = insertDocument(insertClient(), title = "Chunked", content = "Some content.")
+
+        assertFailsWith<DataAccessException> { insertChunk(documentId, sparse = "'{1:1}/100'") }
+    }
+
+    @Test
+    fun `a chunk without a sparse vector is rejected`() {
+        // NULL is not an option: a chunk one arm cannot see would degrade search silently.
+        val documentId = insertDocument(insertClient(), title = "Chunked", content = "Some content.")
+
+        assertFailsWith<DataIntegrityViolationException> { insertChunk(documentId, sparse = "NULL") }
+    }
+
+    @Test
+    fun `a chunk with a vocabulary-width sparse vector is accepted`() {
+        val documentId = insertDocument(insertClient(), title = "Chunked", content = "Some content.")
+
+        insertChunk(documentId, sparse = "'{1:1}/30522'")
+    }
+
+    private fun scalar(sql: String): String = jdbc.sql(sql).query(String::class.java).single()
+
     /** Raw insert, deliberately not going through ClientRepository: the API must not be needed. */
     private fun insertClient(
         firstName: String = "Schema",
@@ -97,12 +133,29 @@ class SchemaConstraintTest(
         clientId: UUID,
         title: String,
         content: String,
-    ) {
+    ): UUID =
         jdbc
-            .sql("INSERT INTO documents (client_id, title, content) VALUES (:c, :t, :b)")
+            .sql("INSERT INTO documents (client_id, title, content) VALUES (:c, :t, :b) RETURNING id")
             .param("c", clientId)
             .param("t", title)
             .param("b", content)
+            .query(UUID::class.java)
+            .single()
+
+    /** [sparse] is spliced in as SQL so the probe can be a literal, a wrong typmod or NULL. */
+    private fun insertChunk(
+        documentId: UUID,
+        sparse: String,
+    ) {
+        val zeros = (1..384).joinToString(",", prefix = "[", postfix = "]") { "0" }
+        jdbc
+            .sql(
+                """
+                INSERT INTO document_chunks (document_id, chunk_index, content, embedding, embedding_model, sparse_embedding, sparse_model)
+                VALUES (:d, 0, 'probe', CAST(:v AS vector), 'probe-model', CAST($sparse AS sparsevec), 'probe-sparse-model')
+                """.trimIndent(),
+            ).param("d", documentId)
+            .param("v", zeros)
             .update()
     }
 }

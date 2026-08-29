@@ -10,7 +10,8 @@
     --bg: #fafafa; --panel: #ffffff; --ink: #1b1e24; --muted: #676d78;
     --line: #e3e5e9; --accent: #2e6df6; --accent-ink: #ffffff;
     --keyword: #8a5a00; --keyword-bg: #fdf3dd; --semantic: #175e63; --semantic-bg: #e2f3f4;
-    --both: #4c3f9e; --both-bg: #ebe8fa; --ok: #1d8348; --err: #b03a2e; --err-bg: #fdedec;
+    --sparse: #2f6b1f; --sparse-bg: #e7f4e1;
+    --multiple: #4c3f9e; --multiple-bg: #ebe8fa; --ok: #1d8348; --err: #b03a2e; --err-bg: #fdedec;
     --mark: #fff1b8;
   }
   @media (prefers-color-scheme: dark) {
@@ -18,7 +19,8 @@
       --bg: #121418; --panel: #1a1d23; --ink: #e8eaed; --muted: #9aa1ab;
       --line: #2a2e36; --accent: #5a8bff; --accent-ink: #0d1117;
       --keyword: #e8bb6a; --keyword-bg: #3a2f16; --semantic: #7fd0d6; --semantic-bg: #14383b;
-      --both: #b3a7f0; --both-bg: #2b2650; --ok: #58c98a; --err: #ef8a80; --err-bg: #3d1f1c;
+      --sparse: #9bd47f; --sparse-bg: #22391a;
+      --multiple: #b3a7f0; --multiple-bg: #2b2650; --ok: #58c98a; --err: #ef8a80; --err-bg: #3d1f1c;
       --mark: #5a4a12;
     }
   }
@@ -89,9 +91,10 @@
     padding: 2.5px 9px; border-radius: 999px; white-space: nowrap;
   }
   .badge.keyword { color: var(--keyword); background: var(--keyword-bg); }
+  .badge.sparse { color: var(--sparse); background: var(--sparse-bg); }
   .badge.semantic { color: var(--semantic); background: var(--semantic-bg); }
-  .badge.both { color: var(--both); background: var(--both-bg); }
-  .badge.client { color: var(--accent); background: var(--both-bg); }
+  .badge.multiple { color: var(--multiple); background: var(--multiple-bg); }
+  .badge.client { color: var(--accent); background: var(--multiple-bg); }
   .card .meta { font-size: 14px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
   .card .body { margin-top: 8px; font-size: 15px; overflow-wrap: anywhere; }
   mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1px; }
@@ -153,7 +156,7 @@
 <main>
   <header>
     <div class="wordmark">Advisor<span>Search</span></div>
-    <div class="tagline">clients and documents, found by text or by meaning</div>
+    <div class="tagline">clients and documents, found by exact text, by learned terms, or by meaning</div>
     <nav class="header-links">
       <a href="/swagger-ui.html">API docs</a>
       <a href="https://github.com/viusiumbeli/advisor-search">Source</a>
@@ -175,7 +178,8 @@
     <span class="chips-label">From the brief, one click each:</span>
     <button class="chip" data-q="AldgateWealth">AldgateWealth — email fragment finds the client</button>
     <button class="chip" data-q="address proof">address proof — finds the electricity bill</button>
-    <button class="chip" data-q="PLC-88213">PLC-88213 — exact token, keyword arm</button>
+    <button class="chip" data-q="PLC-88213">PLC-88213 — exact token, keyword and sparse arms</button>
+    <button class="chip" data-q="double taxation treaty">double taxation treaty — the document says “agreement”</button>
     <button class="chip" data-q="Delacroix-Whitfeld">Delacroix-Whitfeld — misspelled surname</button>
     <button class="chip" data-q="photosynthesis in tropical rainforest canopies">no plausible answer → empty, not noise</button>
   </div>
@@ -334,7 +338,7 @@ function documentCard(hit, query) {
   return `<div class="card" data-id="${esc(d.id)}">
     <div class="card-head">
       <span class="card-title">${esc(d.title)}</span>
-      <span class="badge ${esc(hit.matched_on)}">${esc(hit.matched_on)}</span>
+      <span class="badge ${esc(hit.matched_on)}" title="${esc((hit.sources || []).join(" + "))}">${esc(hit.matched_on)}</span>
       <span class="score">score ${hit.score.toFixed(4)}</span>
     </div>
     <div class="body">${highlight(hit.snippet, query)}</div>

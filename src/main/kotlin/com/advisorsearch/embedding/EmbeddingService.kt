@@ -21,17 +21,22 @@ private const val TITLE_TOKEN_BUDGET = 20
 private const val EMBED_BATCH = 16
 
 /**
- * The one embedding path used by both indexing and querying. Sharing it is what makes the two
- * comparable: a query embedded by different code than the corpus is a silent relevance bug.
+ * The one encoding path used by both indexing and querying, for both models. Sharing it is what
+ * makes a query and the corpus comparable: a query encoded by different code than the corpus — or
+ * a chunk whose title prefix one model saw and the other did not — is a silent relevance bug.
  */
 @Service
 class EmbeddingService(
     private val properties: EmbeddingProperties,
     private val tokenizer: WordPieceTokenizer,
     private val embedder: OnnxEmbedder,
+    private val sparse: SparseEncoder,
+    private val idf: IdfTable,
     private val chunker: Chunker,
 ) {
     val modelId: String get() = properties.modelId
+
+    val sparseModelId: String get() = sparse.modelId
 
     fun chunk(content: String): List<String> = chunker.chunk(content)
 
@@ -57,6 +62,27 @@ class EmbeddingService(
         if (chunks.isEmpty()) return emptyList()
         val prefix = titlePrefix(title)
         return chunks.chunked(EMBED_BATCH).flatMap { batch -> embedder.embedAll(batch.map { prefix + it }) }
+    }
+
+    /**
+     * The inference-free query side: each probe becomes its distinct wordpieces weighted from the
+     * checkpoint's IDF table — a lookup, not a forward pass, which is why the sparse arm adds nothing
+     * measurable to a search's model time.
+     */
+    fun encodeQueriesSparsely(queries: List<String>): List<SparseVector> = queries.map { idf.weigh(tokenizer.tokenIds(it)) }
+
+    /**
+     * The sparse twin of [embedChunks], with the same title prefix so both models describe the same
+     * text. Here the title's terms enter every chunk's expansion, which is the role `setweight('A')`
+     * plays for the lexical arm.
+     */
+    fun encodeChunksSparsely(
+        title: String,
+        chunks: List<String>,
+    ): List<SparseVector> {
+        if (chunks.isEmpty()) return emptyList()
+        val prefix = titlePrefix(title)
+        return sparse.encodeAll(chunks.map { prefix + it })
     }
 
     private fun titlePrefix(title: String): String {
@@ -95,6 +121,12 @@ class EmbeddingService(
             properties.maxTokens,
             properties.chunkTokens,
             properties.chunkOverlapTokens,
+        )
+        log.info(
+            "Sparse model {} ready: {} vocabulary terms, IDF-weighted query wordpieces, at most {} terms stored per chunk",
+            sparse.modelId,
+            idf.size,
+            sparse.maxTerms,
         )
     }
 }

@@ -1,5 +1,7 @@
 package com.advisorsearch.documents
 
+import com.advisorsearch.embedding.SparseVector
+import com.advisorsearch.support.toSparseVectorLiteral
 import com.advisorsearch.support.toVectorLiteral
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
@@ -13,7 +15,7 @@ class DocumentRepository(
 ) {
     /**
      * Document and chunks in one transaction, so a document is never in the keyword index while its
-     * vectors are missing. Embedding happens before the call, to keep a connection off inference.
+     * vectors are missing. Both encodings happen before the call, to keep a connection off inference.
      */
     @Transactional
     fun insertWithChunks(
@@ -23,8 +25,12 @@ class DocumentRepository(
         chunks: List<String>,
         embeddings: List<FloatArray>,
         modelId: String,
+        sparseVectors: List<SparseVector>,
+        sparseModelId: String,
     ): Document {
-        require(chunks.size == embeddings.size) { "Each chunk needs exactly one embedding" }
+        require(chunks.size == embeddings.size && chunks.size == sparseVectors.size) {
+            "Each chunk needs exactly one dense and one sparse vector"
+        }
         val document =
             jdbc
                 .sql(
@@ -39,20 +45,24 @@ class DocumentRepository(
                 .query(Document::class.java)
                 .single()
 
-        // One set-based statement instead of a JDBC batch: the chunks and their vectors travel as
-        // two parallel arrays and Postgres unrolls them server-side, so a 22-chunk document is one
-        // round trip. WITH ORDINALITY numbers the elements, which is exactly chunk_index + 1.
+        // One set-based statement instead of a JDBC batch: the chunks and their two vectors travel
+        // as three parallel arrays and Postgres unrolls them server-side, so a 22-chunk document is
+        // one round trip. WITH ORDINALITY numbers the elements, which is exactly chunk_index + 1.
         jdbc
             .sql(
                 """
-                INSERT INTO document_chunks (document_id, chunk_index, content, embedding, embedding_model)
-                SELECT :documentId, i - 1, c, CAST(v AS vector), :modelId
-                FROM unnest(CAST(:contents AS text[]), CAST(:vectors AS text[])) WITH ORDINALITY AS t(c, v, i)
+                INSERT INTO document_chunks
+                    (document_id, chunk_index, content, embedding, embedding_model, sparse_embedding, sparse_model)
+                SELECT :documentId, i - 1, c, CAST(v AS vector), :modelId, CAST(s AS sparsevec), :sparseModelId
+                FROM unnest(CAST(:contents AS text[]), CAST(:vectors AS text[]), CAST(:sparse AS text[]))
+                     WITH ORDINALITY AS t(c, v, s, i)
                 """.trimIndent(),
             ).param("documentId", document.id)
             .param("contents", chunks.toTypedArray())
             .param("vectors", embeddings.map { it.toVectorLiteral() }.toTypedArray())
             .param("modelId", modelId)
+            .param("sparse", sparseVectors.map { it.toSparseVectorLiteral() }.toTypedArray())
+            .param("sparseModelId", sparseModelId)
             .update()
         return document
     }
@@ -114,10 +124,18 @@ class DocumentRepository(
             .query(Boolean::class.java)
             .single()
 
-    /** Model ids present in the corpus, used by the startup consistency check. */
+    /** Dense model ids present in the corpus, used by the startup consistency check. */
     fun distinctEmbeddingModels(): List<String> =
         jdbc
             .sql("SELECT DISTINCT embedding_model FROM document_chunks")
+            .query(String::class.java)
+            .list()
+            .filterNotNull()
+
+    /** Sparse model ids present in the corpus, for the same check. */
+    fun distinctSparseModels(): List<String> =
+        jdbc
+            .sql("SELECT DISTINCT sparse_model FROM document_chunks")
             .query(String::class.java)
             .list()
             .filterNotNull()

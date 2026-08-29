@@ -1,6 +1,8 @@
 services:
   db:
-    image: pgvector/pgvector:pg18
+    # Pinned to the extension version the schema was measured against: sparsevec arrived in 0.7.0,
+    # and a floating tag would move the numbers in docs/load-and-limits.md without a commit.
+    image: pgvector/pgvector:0.8.6-pg18
     environment:
       POSTGRES_USER: advisor
       POSTGRES_PASSWORD: advisor

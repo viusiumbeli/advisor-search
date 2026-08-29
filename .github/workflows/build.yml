@@ -25,13 +25,16 @@ jobs:
       # Caches ~/.gradle and validates the wrapper jar checksum; a separate
       # wrapper-validation step is redundant with v4+.
       - uses: gradle/actions/setup-gradle@v4
-      # The model is pinned by committed checksums, so the cache key is effectively immutable:
+      # The models are pinned by committed checksums, so the cache key is effectively immutable:
       # written once, restored forever. This takes huggingface.co off the CI critical path.
       - uses: actions/cache@v4
         with:
           path: |
             models/model.onnx
             models/tokenizer.json
+            models/sparse-model.onnx
+            models/sparse-tokenizer.json
+            models/sparse-idf.json
           key: models-${{ hashFiles('models/checksums.sha256') }}
       # ktlint + the full test suite; Testcontainers uses the runner's Docker daemon.
       - run: ./gradlew build

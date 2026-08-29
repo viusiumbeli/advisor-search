@@ -24,7 +24,7 @@ class TestDatabase {
         PostgreSQLContainer(
             // pgvector's image is Postgres plus the extension; Testcontainers needs telling that it
             // can stand in for the official one.
-            DockerImageName.parse("pgvector/pgvector:pg18").asCompatibleSubstituteFor("postgres"),
+            DockerImageName.parse("pgvector/pgvector:0.8.6-pg18").asCompatibleSubstituteFor("postgres"),
         )
 }
 

@@ -10,15 +10,27 @@ import com.advisorsearch.support.WHITESPACE_RUN
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import kotlin.time.TimeSource
+import kotlin.time.measureTimedValue
 
 private val log = LoggerFactory.getLogger(SearchService::class.java)
 
 private const val SNIPPET_LENGTH = 240
 private const val KEYWORD = "keyword"
+private const val SPARSE = "sparse"
 private const val SEMANTIC = "semantic"
 
-/** Most to least corroborated, used only to break exact fusion ties. */
-private val EVIDENCE_ORDER = listOf("both", KEYWORD, SEMANTIC)
+/** What a document hit says when more than one retriever found it; `sources` then says which. */
+private const val MULTIPLE = "multiple"
+
+/**
+ * Most to least literal, used to order `sources` and to break exact fusion ties. A keyword hit is the
+ * token in the document; a sparse hit is the token, or a term the model learned the chunk implies,
+ * in a chunk's representation; a semantic hit is an estimate of meaning.
+ */
+private val EVIDENCE_ORDER = listOf(KEYWORD, SPARSE, SEMANTIC)
+
+/** Every retriever the fusion can name must be here: an unknown one would otherwise sort to the top of a tie. */
+private fun evidenceRank(source: String): Int = EVIDENCE_ORDER.indexOf(source).also { check(it >= 0) { "Unknown retriever $source" } }
 
 @Service
 class SearchService(
@@ -37,20 +49,43 @@ class SearchService(
         val started = TimeSource.Monotonic.markNow()
 
         val clientHits = findClients(query, limit)
-        val keyword = findLexically(query)
-        val semantic = findSemantically(query)
-        val documentHits = fuse(keyword, semantic, limit)
+        val arms = documentArms(query)
+        val documentHits = fuse(arms, limit)
 
+        // Each arm's own time beside its count, so the cost of a retriever is a grep away.
         log.info(
-            "search q='{}' clients={} keyword={} semantic={} returned={} in {}",
+            "search q='{}' clients={} keyword={} ({}) sparse={} ({}) semantic={} ({}) returned={} in {}",
             query,
             clientHits.size,
-            keyword.size,
-            semantic.size,
+            arms.keyword.size,
+            arms.keywordTime,
+            arms.sparse.size,
+            arms.sparseTime,
+            arms.semantic.size,
+            arms.semanticTime,
             documentHits.size,
             started.elapsedNow(),
         )
         return clientHits + documentHits
+    }
+
+    /**
+     * The three floored document rankings for one query: what fusion combines, and what
+     * `SearchArmAblationTest` measures one arm at a time. [expandSparse] exists for that test only —
+     * production runs the sparse arm on the bare query. Measured, the probes changed no golden rank
+     * but lengthened pages: a two-word probe like "bank statement" is a strong partial match for
+     * most of the corpus, so "address proof" carried fifteen sparse candidates into fusion instead
+     * of three.
+     */
+    internal fun documentArms(
+        query: String,
+        expandSparse: Boolean = false,
+    ): DocumentArms {
+        val probes = expander.expand(query)
+        val (keyword, keywordTime) = measureTimedValue { findLexically(query) }
+        val (sparse, sparseTime) = measureTimedValue { findSparsely(if (expandSparse) probes else listOf(query)) }
+        val (semantic, semanticTime) = measureTimedValue { findSemantically(probes) }
+        return DocumentArms(keyword, sparse, semantic, keywordTime, sparseTime, semanticTime)
     }
 
     private fun findClients(
@@ -77,15 +112,36 @@ class SearchService(
     }
 
     /**
+     * The sparse arm: the query's IDF-weighted wordpieces against the learned, expanded chunks. Written
+     * over a list of probes so the ablation can run the lexicon through it, but production passes one.
+     */
+    private fun findSparsely(probes: List<String>): List<DocumentMatch> {
+        val best =
+            embeddings
+                .encodeQueriesSparsely(probes)
+                .filter { !it.isEmpty() }
+                .flatMap { vector ->
+                    // Divided by the probe's own mass while the numbers are still inner products, so
+                    // a two-word and a six-word probe meet the absolute floor on one scale: the score
+                    // becomes the average learned weight the best chunk gives the probe's terms.
+                    documents.sparseSearch(vector, properties.candidateDocuments).map { it.copy(score = it.score / vector.mass) }
+                }.bestByDocument()
+
+        val ceiling = best.firstOrNull()?.score ?: return emptyList()
+        val floor = maxOf(properties.sparseFloor, ceiling * properties.sparseFloorRatio)
+        return best.filter { it.score >= floor }
+    }
+
+    /**
      * Runs the semantic arm once per probe and keeps each document's best result across all of them.
      * The maximum, not a blend: averaging "address proof" with "utility bill" gives a vector that
      * matches both worse than either does alone.
      */
-    private fun findSemantically(query: String): List<DocumentMatch> {
+    private fun findSemantically(probes: List<String>): List<DocumentMatch> {
         // All probes are embedded in one padded batch — one forward pass, not one per probe.
         val best =
             embeddings
-                .embedQueries(expander.expand(query))
+                .embedQueries(probes)
                 .flatMap { vector -> documents.semanticSearch(vector, properties.candidateDocuments) }
                 .bestByDocument()
 
@@ -97,44 +153,49 @@ class SearchService(
     }
 
     private fun fuse(
-        keyword: List<DocumentMatch>,
-        semantic: List<DocumentMatch>,
+        arms: DocumentArms,
         limit: Int,
     ): List<DocumentHit> {
-        val byId = (semantic + keyword).associateBy { it.reference.id }
+        val (keyword, sparse, semantic) = arms
+        // Later entries win, so a document's reference and fallback snippet come from the most
+        // literal arm that found it.
+        val byId = (semantic + sparse + keyword).associateBy { it.reference.id }
         val fused =
             ReciprocalRankFusion.fuse(
                 listOf(
                     RankedList(KEYWORD, keyword.map { it.reference.id }),
+                    RankedList(SPARSE, sparse.map { it.reference.id }),
                     RankedList(SEMANTIC, semantic.map { it.reference.id }),
                 ),
                 properties.rrfK,
             )
 
         // Exact ties are common: two documents that placed equally in different lists score
-        // identically. Evidence breaks them first — a lexical hit is a fact, the token is in the
-        // document, while a semantic hit is an estimate — then title, and only then id, which is
+        // identically. Agreement breaks them first, then the most literal evidence — a lexical hit
+        // is a fact, the token is in the document; a sparse hit is the token or a learned expansion
+        // of it in a chunk; a semantic hit is an estimate — then title, and only then id, which is
         // there to make the order stable rather than to mean anything. Deployments do not share
         // ids, so anything that reordered on id would rank differently from one install to the
         // next. Sorting uses the full-precision score; rounding is presentation and would
         // otherwise manufacture extra ties.
         val headlines = keyword.associate { it.reference.id to it.snippet }
         return fused
-            .map { item ->
-                val match = byId.getValue(item.id)
-                Triple(item, match, if (item.sources.size > 1) "both" else item.sources.first())
-            }.sortedWith(
-                compareByDescending<Triple<FusedDocument, DocumentMatch, String>> { it.first.score }
-                    .thenBy { EVIDENCE_ORDER.indexOf(it.third) }
-                    .thenBy { it.second.reference.title }
-                    .thenBy { it.second.reference.id },
+            .map { item -> Candidate(item, byId.getValue(item.id), EVIDENCE_ORDER.filter { it in item.sources }) }
+            .sortedWith(
+                compareByDescending<Candidate> { it.fused.score }
+                    .thenByDescending { it.sources.size }
+                    .thenBy { evidenceRank(it.sources.first()) }
+                    .thenBy { it.match.reference.title }
+                    .thenBy { it.match.reference.id },
             ).take(limit)
-            .map { (item, match, matchedOn) ->
+            .map { (item, match, sources) ->
                 DocumentHit(
                     score = item.score.asScore(),
-                    matchedOn = matchedOn,
+                    matchedOn = if (sources.size > 1) MULTIPLE else sources.single(),
+                    sources = sources,
                     // A keyword hit carries a ts_headline built around the query terms, which reads
-                    // better than a whole chunk; a semantic-only hit falls back to its best passage.
+                    // better than a whole chunk; any other hit falls back to its best passage — for
+                    // a sparse hit, the chunk whose learned terms the query's own weighed most.
                     snippet = headlines[item.id]?.takeIf { it.isNotBlank() } ?: abbreviate(match.snippet),
                     document = match.reference,
                 )
@@ -148,3 +209,10 @@ class SearchService(
         return collapsed.take(cut).trimEnd(',', '.', ';') + "…"
     }
 }
+
+/** A fused document on its way to becoming a hit: the fusion result, the arm supplying its text, and who found it. */
+private data class Candidate(
+    val fused: FusedDocument,
+    val match: DocumentMatch,
+    val sources: List<String>,
+)
