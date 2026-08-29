@@ -56,14 +56,35 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 }
 
-// The 90 MB ONNX model is not committed. It is fetched once from a pinned Hugging Face revision
-// and verified against the committed checksums, so a fresh clone builds without manual steps and
-// a corrupted or swapped download fails the build instead of silently changing every embedding.
-val modelRevision = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+// The ONNX models are not committed. Each artefact is fetched once from a pinned Hugging Face
+// revision and verified against the committed checksums, so a fresh clone builds without manual
+// steps and a corrupted or swapped download fails the build instead of silently changing every
+// vector. Local names are namespaced because both checkpoints ship a model.onnx and a
+// tokenizer.json, and checksums.sha256 is keyed by file name. The sparse weights come from a
+// third-party ONNX export whose safetensors, tokenizer and IDF table are byte-identical to the
+// official repository's; the checksum pins what was measured, the revision only makes the download
+// reproducible.
+object HuggingFace {
+    fun url(
+        repo: String,
+        revision: String,
+        path: String,
+    ): String = "https://huggingface.co/$repo/resolve/$revision/$path"
+}
+
+val miniLm = "sentence-transformers/all-MiniLM-L6-v2"
+val miniLmRevision = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+val sparseExport = "seerware/opensearch-neural-sparse-encoding-doc-v2-mini"
+val sparseExportRevision = "925b75d04db3ac69dc05881534584078792eb6ea"
+val sparseModel = "opensearch-project/opensearch-neural-sparse-encoding-doc-v2-mini"
+val sparseModelRevision = "4af867a426867dfdd744097531046f4289a32fdd"
 val modelSources =
     mapOf(
-        "model.onnx" to "onnx/model.onnx",
-        "tokenizer.json" to "tokenizer.json",
+        "model.onnx" to HuggingFace.url(miniLm, miniLmRevision, "onnx/model.onnx"),
+        "tokenizer.json" to HuggingFace.url(miniLm, miniLmRevision, "tokenizer.json"),
+        "sparse-model.onnx" to HuggingFace.url(sparseExport, sparseExportRevision, "onnx/fp32/model.onnx"),
+        "sparse-tokenizer.json" to HuggingFace.url(sparseModel, sparseModelRevision, "tokenizer.json"),
+        "sparse-idf.json" to HuggingFace.url(sparseModel, sparseModelRevision, "idf.json"),
     )
 
 // An object rather than a script-level function: the task action below must not capture the build
@@ -86,11 +107,10 @@ object Digest {
 val provisionModel =
     tasks.register("provisionModel") {
         group = "build setup"
-        description = "Downloads the pinned all-MiniLM-L6-v2 ONNX model and tokenizer into models/."
+        description = "Downloads the pinned ONNX models, tokenizers and IDF table into models/."
 
         val modelDir = layout.projectDirectory.dir("models")
         val checksumFile = modelDir.file("checksums.sha256").asFile
-        val revision = modelRevision
         val sources = modelSources
         inputs.file(checksumFile)
         outputs.files(sources.keys.map { modelDir.file(it) })
@@ -105,14 +125,13 @@ val provisionModel =
                         name.trim() to sha
                     }
 
-            sources.forEach { (fileName, remotePath) ->
+            sources.forEach { (fileName, url) ->
                 val target = modelDir.file(fileName).asFile
                 val want = requireNotNull(expected[fileName]) { "No checksum recorded for $fileName" }
                 if (target.exists() && Digest.sha256(target) == want) {
                     logger.lifecycle("models/$fileName is present and matches its checksum")
                     return@forEach
                 }
-                val url = "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/$revision/$remotePath"
                 logger.lifecycle("Downloading models/$fileName from $url")
                 target.parentFile.mkdirs()
                 URI(url).toURL().openStream().use { input ->
@@ -135,9 +154,10 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     dependsOn(provisionModel)
     jvmArgs(nativeAccess)
-    // Forwards -Dcandidates=<dir> to the test JVM for the (normally skipped) model comparison
-    // experiment; see ModelSelectionExperiment.
+    // Forwards -Dcandidates=<dir> and -Dsparse-candidates=<dir> to the test JVM for the (normally
+    // skipped) model comparison experiments; see ModelSelectionExperiment and SparseModelExperiment.
     systemProperty("candidates", providers.systemProperty("candidates").getOrElse(""))
+    systemProperty("sparse-candidates", providers.systemProperty("sparse-candidates").getOrElse(""))
     testLogging {
         events("passed", "failed", "skipped")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL

@@ -12,25 +12,29 @@ Every number here and in [Load and limits](load-and-limits.md) was measured on a
 
 | | |
 | --- | --- |
-| `docker compose up` from clean to healthy | 20 s |
-| Application start | 2.9 s |
-| Embedding warmup at startup | 26 ms |
-| Seeding 20 documents through the real ingest path | 8.8 s |
-| Ingesting the longest document (15,707 chars, 22 chunks) | 757 ms |
-| `GET /search`, one probe, warm | 24 ms median |
-| `GET /search`, 5 expansion probes, warm (batched inference) | 50 ms median |
-| Test suite (91 tests, from clean, no build cache) | 32 s |
-| API container resident memory | 760 to 840 MiB |
-| Image size | 576 MB |
+| `docker compose up` from clean to healthy | 21–27 s (two runs) |
+| Application start | 4.0 s |
+| Model warm-ups at startup | 20–60 ms dense, 50–70 ms sparse |
+| Seeding 20 documents through the real ingest path | 13.4 s |
+| Ingesting a 10 KB document (13 chunks) | 1.14 s: 348 ms dense, 729 ms sparse |
+| `GET /search`, one probe, warm | 30 ms median (server side 28 ms: keyword 0.5–6 ms, sparse 1.0–1.5 ms, semantic 12–25 ms) |
+| `GET /search`, 5 expansion probes, warm (batched inference) | 68 ms median (server side 60 ms, of which the semantic arm's five scans and one forward pass are 57 ms and the sparse arm 1.3 ms) |
+| Test suite (130 tests, from clean, no build cache) | 60 s |
+| API container resident memory | 1.37 GiB after seeding and 1.52 GiB after a 99 KB ingest under a 2 GB limit; 1.6–1.8 GiB with no limit, where the heap is left to grow |
+| Image size | 716 MB |
 
 ## Ingest is synchronous
 
-A `201` means chunked, embedded and committed, so there is no window in which a caller can read back
-a document that search cannot find. Embedding happens *before* the transaction opens, so a
-connection is never held across model inference. At roughly 35 to 55 ms per chunk this holds to
-around 100 chunks per request. The point to move ingest to a background job is when p99 for
-`POST /clients/{id}/documents` passes about 5 s, which on these numbers means documents beyond
-roughly 100,000 characters, or a sustained bulk import.
+A `201` means chunked, encoded by both models and committed, so there is no window in which a caller
+can read back a document that search cannot find. Both encodings happen *before* the transaction
+opens, so a connection is never held across model inference. A chunk now costs roughly 25 ms of
+dense inference plus 50 ms of sparse — the sparse model's encoder is the dense model's size, but its
+vocabulary-wide output head is as large again and runs at every position — so the criterion this
+section has always named, a p99 for `POST /clients/{id}/documents` above about 5 s, is reached at
+roughly 65 chunks: 6.5 s for a document at the 100,000-character cap (95 chunks), against 0.93 s
+for the brief's average 10 KB. The criterion has therefore been met rather than moved: the next
+change to ingest is the background job, and until it exists a caller's timeout has to be sized for
+the cap.
 
 ## There is deliberately no ANN index
 
@@ -52,6 +56,23 @@ CREATE INDEX ON document_chunks USING hnsw (embedding vector_cosine_ops);
 
 That trades exactness for speed, which is a decision to make with a recall measurement in hand
 rather than pre-emptively.
+
+The sparse column is scanned exactly for the same reason, and the numbers are of the same shape:
+1.2–2.6 ms at 153 chunks against the dense arm's 1.5–1.8 ms, and about 420 ms at 99,700 chunks
+against about 520 ms for the dense arm — which was 244 ms before the sparse column existed. That
+last number is the real cost of the third arm at scale, and it lands on the *dense* scan: both
+vectors are stored out of line, their chunks interleave in the one TOAST relation, and a scan that
+wants only the dense vector still moves the sparse bytes through the buffer cache beside it. The
+table is 503 MB at that size, against a 128 MB `shared_buffers`, so every exact scan is now a read of
+the whole relation rather than half of it. At the corpus that ships none of this is visible; past
+the crossover, the first change is to put the sparse vectors in a table of their own so each arm
+reads only its own bytes — a one-migration change — and only then to ask whether either column wants
+an index. Two facts to hold on to if one is ever wanted: pgvector's only sparse index is HNSW (`sparsevec_ip_ops` for
+`<#>`; IVFFlat does not support `sparsevec`), and it accepts at most 1,000 non-zeros per value, which
+`sparse.max-terms` keeps every stored vector under. And an HNSW index serves `ORDER BY … LIMIT k`
+over chunks, not the per-document `min()` the search runs — indexing either column means going back
+to the chunk-bounded shortlist that [search design](search-design.md#documents-three-retrievers)
+rejects, so that decision, too, wants a recall measurement first.
 
 ## The client query uses its index at scale
 
@@ -75,21 +96,32 @@ the same predicate, the plan is what the design intends — one GIN index servin
 
 ## Model provenance
 
-`models/checksums.sha256` is committed with the real hashes; `./gradlew provisionModel` fetches
-`model.onnx` and `tokenizer.json` from a pinned Hugging Face revision and fails the build on a
-mismatch, so a corrupted or swapped download cannot silently change every embedding. Tests depend on
-that task, so a fresh clone runs `./gradlew test` without any manual step. The model is not
-committed (90 MB) but *is* baked into the Docker image, so a running container needs no network
-beyond Postgres.
+`models/checksums.sha256` is committed with the real hashes; `./gradlew provisionModel` fetches five
+files — the dense model and its tokenizer from `sentence-transformers/all-MiniLM-L6-v2`, the sparse
+model's ONNX export from `seerware/opensearch-neural-sparse-encoding-doc-v2-mini`, and its tokenizer
+and IDF table from `opensearch-project/opensearch-neural-sparse-encoding-doc-v2-mini` — each from a
+pinned Hugging Face revision, and fails the build on a mismatch, so a corrupted or swapped download
+cannot silently change every vector. Tests depend on that task, so a fresh clone runs
+`./gradlew test` without any manual step. The models are not committed (230 MB) but *are* baked into
+the Docker image, so a running container needs no network beyond Postgres. The sparse export is a
+third-party mirror of the official weights — its safetensors, tokenizer and IDF blobs are
+byte-identical to the official repository's, and `SparseEncoderTest` pins its output against the
+official PyTorch checkpoint — but the checksum protects integrity, not availability: mirroring the
+three files to a repository this project controls is the named follow-up before anything depends on
+that mirror still existing.
 
-Every chunk row records the model that produced it, and startup fails with a "reindex required"
-message if the corpus contains vectors from a different model. Vectors from two models share a
-column but not a space, and comparing them produces confident nonsense rather than an error.
+Every chunk row records both models that produced it, and startup fails with a "reindex required"
+message if the corpus contains vectors from a different one. Vectors from two dense models share a
+column but not a space, and comparing them produces confident nonsense rather than an error; term
+weights from two sparse checkpoints share a vocabulary axis but not a scale, which is the same
+failure without even the appearance of being wrong. The sparse columns arrived in `V2` as `NOT NULL`
+— legal because no instance held data when it shipped — so an older volume with rows fails the
+migration with "column contains null values" and has to be recreated rather than half-served.
 
 ## Readiness gates traffic, not only the probe
 
-Tomcat accepts connections as soon as the context refreshes, which is before the model check, the
-warmup and the seed runner have run — so the published port is open while the corpus is still being
+Tomcat accepts connections as soon as the context refreshes, which is before the model checks, the
+warm-ups and the seed runner have run — so the published port is open while the corpus is still being
 embedded. A filter answers `503` on everything except the probes, the API documentation and the
 console page until Spring Boot flips readiness, which it does only once every runner has returned.
 Without it the window is not merely cosmetic: a `POST` landing inside it can commit vectors from one
@@ -173,7 +205,9 @@ still builds locally, so the repository never depends on the registry being reac
 ## Deployment
 
 The live instance runs on a Hetzner Cloud VPS. Postgres 18 or later is required, since the schema
-uses the native `uuidv7()`; the migration creates `pgvector` and `pg_trgm` on first start. Provision
+uses the native `uuidv7()`, and pgvector 0.7.0 or later for `sparsevec` — the compose files pin
+`pgvector/pgvector:0.8.6-pg18`, the version the measurements were made against, rather than the
+floating tag; the migrations create `pgvector` and `pg_trgm` on first start. Provision
 with the `hcloud` CLI (`hcloud context create`, or `HCLOUD_TOKEN` in the environment):
 
 ```bash
@@ -235,9 +269,10 @@ hcloud firewall delete advisor-fw && hcloud ssh-key delete advisor-hetzner
 
 This system is stage one of three, and each stage's trigger is named rather than guessed. Stage
 one — the current corpus scale — is the exact scan and in-process embedding measured above. Stage
-two, from roughly 50k chunks: the HNSW index whose DDL is
-[above](#there-is-deliberately-no-ann-index), a floor recalibration, async ingest once its p99
-criterion trips, and vector quantization near the top end. Stage three, tens of millions of rows and
+two, from roughly 50k chunks: the HNSW indexes whose DDL and caveats are
+[above](#there-is-deliberately-no-ann-index) — the sparse one capped at 1,000 non-zeros a row — a
+floor recalibration, async ingest (its p99 criterion has already tripped at the content cap, see
+[Ingest is synchronous](#ingest-is-synchronous)), and vector quantization near the top end. Stage three, tens of millions of rows and
 up, starts with the domain answer rather than infrastructure: advisor search is tenant-scoped, so
 partitioning by organisation prunes a 100-million-row table to one advisor's book per query — after
 which each partition is back at a scale this design handles. Only genuinely global search forces

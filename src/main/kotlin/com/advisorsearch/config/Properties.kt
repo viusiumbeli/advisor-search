@@ -25,6 +25,20 @@ data class EmbeddingProperties(
     @field:PositiveOrZero val chunkOverlapTokens: Int,
 )
 
+/** pgvector's storage cap on the non-zero elements of one sparsevec value. */
+private const val SPARSEVEC_MAX_TERMS = 16_000L
+
+@Validated
+@ConfigurationProperties(prefix = "sparse")
+data class SparseProperties(
+    @field:NotBlank val modelPath: String,
+    @field:NotBlank val tokenizerPath: String,
+    @field:NotBlank val idfPath: String,
+    @field:NotBlank val modelId: String,
+    /** Bounded by what pgvector can store at all; the default sits at its stricter HNSW ceiling, see application.yml. */
+    @field:Positive @field:Max(SPARSEVEC_MAX_TERMS) val maxTerms: Int,
+)
+
 @Validated
 @ConfigurationProperties(prefix = "search")
 data class SearchProperties(
@@ -33,6 +47,9 @@ data class SearchProperties(
     @field:DecimalMin("0.0") @field:DecimalMax("1.0") val semanticFloor: Double,
     @field:DecimalMin("0.0") @field:DecimalMax("1.0") val semanticFloorRatio: Double,
     @field:DecimalMin("0.0") @field:DecimalMax("1.0") val keywordFloorRatio: Double,
+    /** An inner product over the query's own mass, not a cosine, so there is no upper bound to validate against. */
+    @field:DecimalMin("0.0") val sparseFloor: Double,
+    @field:DecimalMin("0.0") @field:DecimalMax("1.0") val sparseFloorRatio: Double,
     @field:DecimalMin("0.0") @field:DecimalMax("1.0") val wordSimilarityThreshold: Double,
     @field:Positive val minFuzzyQueryLength: Int,
     @field:Positive val candidateDocuments: Int,

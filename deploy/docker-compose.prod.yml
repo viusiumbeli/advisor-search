@@ -23,7 +23,7 @@
 
 services:
   db:
-    image: pgvector/pgvector:pg18
+    image: pgvector/pgvector:0.8.6-pg18
     restart: unless-stopped
     environment:
       POSTGRES_USER: advisor
@@ -54,7 +54,7 @@ services:
     image: caddy:2-alpine
     restart: unless-stopped
     depends_on:
-      # Healthy, not merely started: readiness covers the model check and the embedding warmup, so
+      # Healthy, not merely started: readiness covers both model checks and warm-ups, so
       # on bring-up the public address waits rather than proxying to an instance that is not
       # serving yet. It orders `compose up` only — once both are running, the app's own readiness
       # filter is what answers 503 during a restart.

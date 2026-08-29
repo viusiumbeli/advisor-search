@@ -6,14 +6,14 @@ A search API over clients and their documents, built for the two cases in the br
 an email domain finds its client, and "address proof" finds documents that can evidence an address
 even when they never use either word.
 
-Clients are matched with trigrams over name, email and description. Documents are matched twice —
-once by Postgres full-text search, once by embedding similarity — and the two rankings are combined
-with reciprocal rank fusion. Everything runs in two containers, and the embedding model is baked
-into the image and runs in-process, so there is no third-party API to sign up for, nothing external
-to be down, and no per-query cost.
+Clients are matched with trigrams over name, email and description. Documents are matched three
+ways — Postgres full-text search, learned sparse term weights (SPLADE) and embedding similarity —
+and the three rankings are combined with reciprocal rank fusion. Locally it is two containers, and
+both models are baked into the image and run in-process, so there is no third-party API to sign up
+for, nothing external to be down, and no per-query cost.
 
-Kotlin 2.4 · Spring Boot 4.1 · Postgres 18 with `pgvector` and `pg_trgm` · `all-MiniLM-L6-v2` on
-ONNX Runtime.
+Kotlin 2.4 · Spring Boot 4.1 · Postgres 18 with `pgvector` and `pg_trgm` · `all-MiniLM-L6-v2` and
+`opensearch-neural-sparse-encoding-doc-v2-mini` on ONNX Runtime.
 
 ---
 
@@ -82,17 +82,18 @@ $ curl -sG localhost:8080/search --data-urlencode 'q=AldgateWealth' | jq '.[0]'
 
 ```console
 $ curl -sG localhost:8080/search --data-urlencode 'q=address proof' \
-    | jq -r '.[] | "\(.matched_on)\t\(.document.title)"'
-keyword     Onboarding Checklist: Identity and Address Verification
-semantic    Bank Statement, Current Account, March
-semantic    Assured Shorthold Tenancy Summary, 22 Rookery Lane
-semantic    Electricity Account Statement, 14 Marlow Court
+    | jq -r '.[] | "\(.sources | join("+"))\t\(.document.title)"'
+keyword+sparse     Onboarding Checklist: Identity and Address Verification
+sparse+semantic    Assured Shorthold Tenancy Summary, 22 Rookery Lane
+semantic           Bank Statement, Current Account, March
+semantic           Electricity Account Statement, 14 Marlow Court
 ```
 
-Four results, and all four can evidence where a client lives. Only the first contains the words
-"address" and "proof"; the other three are reached by meaning alone. The electricity bill mentions
-neither word anywhere — it talks about meter readings, unit rates and direct debits — and getting it
-into that list was the hardest part of the task, written up in
+Four results, and all four can evidence where a client lives. Only the first contains both words;
+the tenancy summary says "address" and is reached by learned term weights as well as by meaning; the
+bank statement and the electricity bill are reached by meaning alone. The bill mentions neither word
+anywhere — it talks about meter readings, unit rates and direct debits — and getting it into that
+list was the hardest part of the task, written up in
 [why the task's own example needs more than a model](docs/search-design.md#why-the-tasks-own-example-needs-more-than-a-model).
 
 `./demo.sh` runs both of these plus every other endpoint against a local stack.
@@ -133,9 +134,11 @@ Four additions, each because the fragment specifies a shape rather than a whole 
 - **`409` on a duplicate email.** Advisors search by email, which makes it the identity key.
 - **The `GET` endpoints.** A `201` with a `Location` header and search results with snippets are
   both dangling without a way to fetch the thing they point at.
-- **`score`, `matched_on` and `snippet` on search hits.** The fragment types search results as
-  `type: object`, and a result you cannot explain is hard to trust. `matched_on` is `email`, `name`,
-  `description` or `profile` for clients, and `keyword`, `semantic` or `both` for documents.
+- **`score`, `matched_on`, `sources` and `snippet` on search hits.** The fragment types search
+  results as `type: object`, and a result you cannot explain is hard to trust. `matched_on` is
+  `email`, `name`, `description` or `profile` for clients; for documents it names the one retriever
+  that found it — `keyword`, `sparse` or `semantic` — or says `multiple`, and `sources` lists which,
+  most literal first.
 - **`POST /demo-corpus`.** Not part of the API the brief describes, and it says so with its own
   `Demo` tag. It exists because a deployed instance that starts empty cannot demonstrate the brief's
   own examples, and asking a reviewer to run the project locally to see them is a worse answer than
@@ -156,25 +159,38 @@ fail. `FtsEmailTokenisationProofTest` pins that behaviour. Instead a generated `
 carries the lowercased name, email and description under one `gin_trgm_ops` index, queried through
 two arms — a literal substring match scoring 1.0, and `word_similarity` for typos.
 
-**Documents get two retrievers.** A stored `tsvector` with `setweight` (title A, content B) finds
+**Documents get three retrievers.** A stored `tsvector` with `setweight` (title A, content B) finds
 rare exact tokens that embeddings treat as noise, like the policy number `PLC-88213`. Alongside it,
 documents are chunked to ~200 wordpieces and embedded with `all-MiniLM-L6-v2` as `vector(384)`, and
 search reduces the corpus to each document's own nearest chunk and shortlists the best thirty —
 counted in documents rather than chunks, so a long report cannot fill the shortlist and crowd a
 short one out of it. Because `websearch_to_tsquery` combines terms with AND, the lexical arm
-legitimately returns nothing for many queries — which is why the two arms are unioned, not joined.
+legitimately returns nothing for many queries — which is why the arms are unioned, not joined.
 
-**The rankings are fused, not blended.** `ts_rank_cd` and cosine similarity are on unrelated scales,
-so the two lists are combined with reciprocal rank fusion — `1/(k + rank)`, `k = 60` — which
-combines rankings rather than scores. Relevance cut-offs are applied *before* fusion, because once a
-score has become a rank "not similar enough" is no longer expressible. Clients stay out of the
-fusion entirely: a client can never appear in a document ranking, so an exact email match would be
-capped at `1/61` and lose to an average document.
+**The third retriever is learned sparse.** Each chunk also gets a SPLADE representation from
+`opensearch-neural-sparse-encoding-doc-v2-mini`: a weight for every vocabulary term the chunk states
+or implies, stored as a pgvector `sparsevec(30522)` beside the dense vector. A query is its own
+wordpieces weighted by the checkpoint's IDF table — a lookup, not a second forward pass — scored by
+inner product and reduced per document exactly like the semantic arm. This is graded lexical
+matching: "electricity supplier statement" scores the bill on the two words it does contain where
+the AND of full-text search finds nothing, and "double taxation treaty" reaches a chunk that only
+says "agreement" because the model learned to add `treaty` to it. What it does not do is know the
+domain — the bill still says nothing an IDF table can connect to "address proof", so the lexicon
+below stays. Two checkpoints were measured before this one was chosen; the table is in
+[search design](docs/search-design.md#sparse-learned-term-weights).
+
+**The rankings are fused, not blended.** `ts_rank_cd`, an inner product and a cosine are on
+unrelated scales, so the three lists are combined with reciprocal rank fusion — `1/(k + rank)`,
+`k = 60` — which combines rankings rather than scores. Relevance cut-offs are applied *before*
+fusion, because once a score has become a rank "not similar enough" is no longer expressible.
+Clients stay out of the fusion entirely: a client can never appear in a document ranking, so an
+exact email match would be capped at `1/61` and lose to an average document.
 
 **One case needed more than a model.** The brief asks that "address proof" return documents
 containing "utility bill". The seeded electricity bill scores 0.484 against "utility bill" but 0.139
-against "address proof", where it ranks 13th — and all five sentence-embedding models I measured
-ranked it 13th to 18th while ranking every other probe first. "An electricity bill can evidence
+against "address proof", where it ranks 13th — all five sentence-embedding models I measured ranked
+it 13th to 18th, and the learned sparse model 4th, while ranking every other probe first. "An
+electricity bill can evidence
 where you live" is procedural knowledge about a domain, not a distributional fact about English, so
 it is stated explicitly in `src/main/resources/search/query-expansions.json`: five concepts, each
 with the phrases that trigger it and the phrases to also search for. A matching query runs as
@@ -191,18 +207,20 @@ The measurements behind each of these, the SQL, and how every cut-off was calibr
 Measured on a MacBook Pro (Apple M3 Pro, 12 cores, 36 GB RAM, macOS 26.5.2) with Docker Desktop,
 against the seeded corpus of 10 clients, 20 documents and 153 chunks.
 
-`golden-queries.json` holds 25 queries an advisor might type, each with the one result that must
+`golden-queries.json` holds 28 queries an advisor might type, each with the one result that must
 come back; `SearchQualityTest` asserts every one lands in the top five and prints mean reciprocal
 rank, so results sliding down the list is visible even while every query still passes.
+`SearchArmAblationTest` fuses every combination of the three document arms and prints the same
+numbers per combination, which is how the third arm earned its place.
 
 | | |
 | --- | --- |
-| Retrieval quality | documents 18/18 hit@5 (MRR 0.778), clients 7/7 (MRR 0.929) |
-| `GET /search`, warm | 24 ms median, 50 ms when a query expands to five probes |
-| Under concurrency | p95 130 ms at 20 concurrent clients, 188 req/s |
-| Ingest | 269 ms for a 10 KB document, 2.3 s at the 100,000-character cap |
-| Exact vector scan | the right choice to ~50,000 chunks, where an HNSW index starts to earn its keep |
-| Startup and tests | healthy 20 s after `docker compose up`; 91 tests from clean in 32 s |
+| Retrieval quality | documents 21/21 hit@5 (MRR 0.859; the two-arm fusion scores 0.810 on the same set), clients 7/7 (MRR 0.929) |
+| `GET /search`, warm | 30 ms median, 68 ms when a query expands to five probes — the sparse arm is about 1.3 ms of either; the rest is the semantic arm's inference and scans |
+| Under concurrency | p95 150 ms at 20 concurrent clients, 115 req/s |
+| Ingest | 0.93 s for a 10 KB document, 6.5 s at the 100,000-character cap — two models per chunk, and past the point at which the design says ingest should go asynchronous |
+| Exact scans | the right choice into the tens of thousands of chunks; at 99,700 the two vector columns share one TOAST relation and each arm's scan pays for both — the large-corpus story now starts with separating them |
+| Startup and tests | healthy about 25 s after `docker compose up`; 130 tests from clean in 60 s |
 
 Sustained-load tables across three corpus scales, and the ceilings the system runs against, are in
 [load and limits](docs/load-and-limits.md); the design notes behind these numbers are in
@@ -212,8 +230,9 @@ Sustained-load tables across three corpus scales, and the ceilings the system ru
 
 ## Deploying it
 
-The live instance runs on a Hetzner Cloud VPS (`cpx32`, 4 vCPU / 8 GB — the JVM plus ONNX Runtime's
-native arenas need a 2 GB floor, and 256 MB OOMs) from
+The live instance runs on a Hetzner Cloud VPS (`cpx32`, 4 vCPU / 8 GB — the JVM plus two ONNX
+Runtime sessions need a 2 GB floor: a 1 GB limit is OOM-killed while seeding, 2 GB settles at about
+1.5 GB resident) from
 [`deploy/docker-compose.prod.yml`](deploy/docker-compose.prod.yml): the published image beside a
 `pgvector/pgvector:pg18` container, both secrets read from a server-side `.env`, and no public
 Postgres port. Provisioning steps are in
@@ -228,6 +247,7 @@ Each of these was considered and deliberately not built.
 - **Generative summaries.** The summary is extractive, so it cannot invent a fact about a client's finances ([detail](docs/search-design.md#scope-what-search-deliberately-does-not-do)).
 - **Semantic search over client descriptions.** "retired educator" will not find a "retired teacher"; the brief's client example is lexical.
 - **A cross-encoder re-ranker.** The principled fix for the floor-calibration overlap, at ~50 ms per query ([detail](docs/search-design.md#calibrating-the-cut-offs)).
+- **A symmetric SPLADE model.** The sparse arm that shipped is inference-free on the query side; the BERT-base `Splade_PP_en_v1`, which expands queries too, scored higher alone but let nonsense through, at four times the ingest cost and 530 MB ([the measurement](docs/search-design.md#sparse-learned-term-weights)).
 - **An ANN index.** An exact scan cannot miss a neighbour, and at this size it is not the bottleneck ([thresholds](docs/operating-notes.md#there-is-deliberately-no-ann-index)).
 - **Asynchronous ingest.** A `201` currently means searchable ([the p99 that would change it](docs/operating-notes.md#ingest-is-synchronous)).
 - **One ranked list across clients and documents.** The scales are not comparable, hence two blocks.
@@ -252,12 +272,13 @@ automatically on the first build. Gradle's configuration cache is on, so repeat 
 configuration entirely. Integration tests share one pgvector container through a cached Spring
 context — without that sharing the suite would start Postgres once per test class — and only the API
 key test, which changes properties, gets a context and container of its own. CI builds every push
-and pull request (lint, full suite against real Postgres, image build), with the model cached under
-its committed checksum key so huggingface.co is not on the critical path; pushes to main publish the
+and pull request (lint, full suite against real Postgres, image build), with both models cached under
+their committed checksum key so huggingface.co is not on the critical path; pushes to main publish the
 multi-arch image that `docker compose pull` fetches, with SBOM and provenance attestations.
 
-Layout: `embedding/` is the tokenizer, ONNX encoder and chunker; `clients/` and `documents/` are the
-write path; `search/` holds the three retrievers, with `search/ranking/` for reciprocal rank fusion
+Layout: `embedding/` is the tokenizer, the two ONNX encoders and the chunker; `clients/` and
+`documents/` are the write path; `search/` holds the four retrievers — clients, and the three
+document arms — with `search/ranking/` for reciprocal rank fusion
 and `search/expansion/` for the domain lexicon; `seed/` loads the demo corpus (`seed/corpus/`)
 through the real service layer. The two conventions the layout follows are in
 [operating notes](docs/operating-notes.md#file-organisation).

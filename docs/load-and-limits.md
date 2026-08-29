@@ -29,54 +29,57 @@ inference-bound concurrency — do not.
 
 | Corpus (docs / chunks / clients) | Concurrency | p50 | p95 | p99 | max | Throughput |
 | --- | --- | --- | --- | --- | --- | --- |
-| 20 / 153 / 10 | 1 | 15 ms | 24 ms | 25 ms | 35 ms | 39.5 req/s |
-| 20 / 153 / 10 | 5 | 20 ms | 46 ms | 65 ms | 78 ms | 112.7 req/s |
-| 20 / 153 / 10 | 10 | 33 ms | 71 ms | 95 ms | 117 ms | 154.6 req/s |
-| 20 / 153 / 10 | 20 | 63 ms | 130 ms | 150 ms | 173 ms | 188.3 req/s |
-| 1,008 / 7,900 / 10,001 | 1 | 26 ms | 66 ms | 74 ms | 80 ms | 21.3 req/s |
-| 1,008 / 7,900 / 10,001 | 10 | 71 ms | 178 ms | 225 ms | 243 ms | 92.7 req/s |
-| 13,008 / 99,700 / 10,001 | 1 | 113 ms | 189 ms | 265 ms | 311 ms | 6.8 req/s |
-| 13,008 / 99,700 / 10,001 | 10 | 482 ms | 944 ms | 1,069 ms | 1,186 ms | 17.7 req/s |
+| 20 / 153 / 10 | 1 | 33 ms | 50 ms | 56 ms | 137 ms | 22.7 req/s |
+| 20 / 153 / 10 | 5 | 40 ms | 75 ms | 85 ms | 112 ms | 82.1 req/s |
+| 20 / 153 / 10 | 10 | 55 ms | 92 ms | 121 ms | 187 ms | 101.9 req/s |
+| 20 / 153 / 10 | 20 | 83 ms | 150 ms | 181 ms | 209 ms | 114.5 req/s |
+| 1,008 / 7,900 / 10,001 | 1 | 61 ms | 106 ms | 114 ms | 120 ms | 12.1 req/s |
+| 1,008 / 7,900 / 10,001 | 10 | 140 ms | 279 ms | 299 ms | 316 ms | 56.5 req/s |
+| 13,008 / 99,700 / 10,001 | 1 | 761 ms | 846 ms | 926 ms | 1314 ms | 1.3 req/s |
+| 13,008 / 99,700 / 10,001 | 10 | 1489 ms | 1630 ms | 1665 ms | 1666 ms | 6.5 req/s |
 
-Two shapes matter more than any single cell. Latency grows linearly with chunk count because the
-semantic arm is an exact scan — these rows are the measured demonstration of the [~50,000-chunk
-HNSW crossover](operating-notes.md#there-is-deliberately-no-ann-index), and at 99,700 chunks with ten concurrent clients the p95 is already
-near a second. Within one corpus, added concurrency divides the same twelve cores: throughput
-rises (39 to 188 req/s at seed scale) while per-request latency stretches, which is
-inference-bound CPU rather than lock contention — the same fact that keeps virtual threads off
-(see [Runtime and data-access choices](operating-notes.md#runtime-and-data-access-choices)).
+Two shapes matter more than any single cell. Latency grows with chunk count because both learned
+arms are exact scans — these rows are the measured demonstration of the
+[crossover](operating-notes.md#there-is-deliberately-no-ann-index) past which the exact scan is the
+wrong tool. Within one corpus, added concurrency divides the same twelve cores: throughput rises (23
+to 115 req/s at seed scale) while per-request latency stretches, which is inference-bound CPU rather
+than lock contention — the same fact that keeps virtual threads off (see
+[Runtime and data-access choices](operating-notes.md#runtime-and-data-access-choices)).
 
-One caveat on the last two rows. They were measured before the semantic arm was changed to shortlist
-documents rather than chunks ([search design](search-design.md#documents-two-retrievers)), and the
-arm's own cost at that scale went from 100 ms to 244 ms per query, which lands on top of them. At
-the corpus that ships the change is not visible: running both versions side by side on one machine,
-three rounds of 200 requests each, put them at 16–17 ms against 18–20 ms p50 at concurrency 1 — the
-gap being about the difference between a JVM up for hours and one just started — and inside each
-other's spread at 20 (69–72 ms against 67–79 ms). The large corpus is where it costs, and that is
-the same thing these rows already say: past the crossover the exact scan is the wrong tool, and the
-answer is the index rather than a cheaper way to be wrong.
+The large-corpus rows are the third arm's bill, and it is larger than the sparse scan alone. Before
+the sparse column existed the same rows read 113 ms and 482 ms p50; the sparse arm's own scan at
+99,700 chunks is about 420 ms, but the *dense* scan beside it went from 244 ms to about 520 ms,
+because the two vectors' out-of-line chunks interleave in one TOAST relation and a scan of either
+column now moves both through a 128 MB buffer cache. At the corpus that ships none of this shows —
+seed-scale p50 moved from 15 to 33 ms at concurrency 1, most of it the third round trip and the
+third arm's share of a JVM warmed by only twenty requests. Past the crossover the first change is
+structural rather than an index: the sparse vectors in their own table, so each arm reads its own
+bytes, and only then the question of indexing either column
+([operating notes](operating-notes.md#there-is-deliberately-no-ann-index)).
 
 ## Ingest under load
 
 | Scenario | Result |
 | --- | --- |
-| One 10 KB document (the brief's average size), seed corpus | 269 ms, 10 chunks |
-| Five 10 KB documents concurrently | per-request p50 710 ms, max 741 ms; 6.3 docs/s aggregate |
-| One 99 KB document (just under the cap) | 2.3 s, 95 chunks |
-| Search while that 99 KB ingest runs (200 requests, concurrency 10) | p50 42 ms, p95 93 ms — from p50 33 ms, p95 71 ms idle |
-| One 10 KB document again, at the large corpus | 335 ms — ingest cost is model inference, not corpus size |
+| One 10 KB document (the brief's average), seed corpus | 927 ms, 10 chunks |
+| Five 10 KB documents concurrently | per-request p50 2700 ms, max 2782 ms; 1.8 docs/s aggregate |
+| One 99 KB document (just under the cap) | 6.5 s, 95 chunks |
+| Search while the 99 KB ingest runs (200 requests, concurrency 10) | p50/p95/p99/max: 86 ms, 147 ms, 206 ms, 223 ms, 75.3 req/s |
+| One 10 KB document again, at the large corpus | 904 ms — ingest cost is model inference, not corpus size |
 
 Ingest cost is a function of document size, not corpus size — the same 10 KB document costs about
-the same at 153 chunks as at 99,700. A maximum-size document is the one row that moved: chunks are
-encoded sixteen at a time rather than as one padded batch, which costs roughly 0.6 s on 95 chunks
-and buys a peak native-memory ceiling that no longer scales with document length times concurrent
-ingests (the rationale is on `EMBED_BATCH` in `EmbeddingService`). Documents at the corpus's average
-size are a single batch either way. Five concurrent ingests triple per-request latency for the
-same reason five concurrent searches stretch search: they queue for the same cores. A
-maximum-size document is 2.3 s of synchronous work, which is what a caller's timeout has to be
-sized for; the criterion for moving ingest behind a background job (p99 over 5 s) is in
-[Operating notes](operating-notes.md#ingest-is-synchronous). On this 12-core machine one background
-ingest lifts search p95 by about a third (71 to 93 ms); on the deploy's four shared vCPUs the same
+the same at 153 chunks as at 99,700. Every chunk now goes through two models: the dense pass in
+batches of sixteen and the sparse pass in batches of four, the latter because its vocabulary-wide
+output tensor is 27 MiB per chunk and is held twice while it is pooled (the rationale is on
+`EMBED_BATCH` in `EmbeddingService` and `SPARSE_BATCH` in `SparseEncoder`). The sparse pass costs
+about twice the dense one — its encoder is the same size, but the output head is as large again and
+runs at every position — which is what took the 10 KB document from 269 ms to 0.93 s and the
+maximum-size one from 2.3 s to 6.5 s. Five concurrent ingests triple per-request latency for the same
+reason five concurrent searches stretch search: they queue for the same cores. A maximum-size
+document is now 6.5 s of synchronous work, past the criterion for moving ingest behind a background
+job (p99 over 5 s) in [Operating notes](operating-notes.md#ingest-is-synchronous), and until that
+job exists it is what a caller's timeout has to be sized for. On this 12-core machine one background
+ingest lifts search p95 by about half (92 to 147 ms); on the deploy's four shared vCPUs the same
 contention bites harder — one ingest occupies a quarter of the cores rather than a twelfth — which
 is the bounded-pool admission-control argument in the
 [virtual-threads note](operating-notes.md#runtime-and-data-access-choices).
@@ -90,10 +93,11 @@ The ceilings the system runs against, and what happens at each:
 | `content` length | 100,000 characters | Per-field `400` from the API; the schema `CHECK` backstops non-API writers. |
 | tsvector lexeme pool (the generated `fts` column) | 1,048,575 bytes | `ERROR` at `INSERT`. Unreachable through the API: 100,000 pathological all-distinct-word characters measure 165,060 bytes (6× headroom), the seeded corpus's real prose — 107,464 characters — measures 52,054 bytes (20×), and the pathological shape fails only past ~850,000 characters. |
 | tsvector positions | 16,383 per document | Silent: past ~16,000 words every further word reads back as position 16,383, and `ts_rank_cd` is cover density — positional by definition — so lexical ranking inputs quietly degrade. 100,000 characters ≈ 16,000 English words: the cap sits on this boundary (confirmed by measurement after the number was chosen, not the reason for it). |
-| Encoder window | 256 wordpieces | Silent truncation — prevented per chunk by the chunker's hard-window fallback. |
-| Exact vector scan | ~50,000 chunks | The crossover to the [HNSW index](operating-notes.md#there-is-deliberately-no-ann-index); the large-corpus search rows show why. |
-| Synchronous ingest | 5 s p99 | Move ingest behind a background job; at the cap a document costs 2.3 s. |
-| Machine memory | 2 GB floor | JVM plus ONNX Runtime's native arenas; 256 MB OOMs, and the api container settles between 760 and 840 MB resident. Sized for in [Deploying it](../README.md#deploying-it). |
+| Encoder window | 256 wordpieces | Silent truncation — prevented per chunk by the chunker's hard-window fallback. Both models read the same tokenizer output; the sparse model would accept 512, the shared window is the dense model's. |
+| Sparse vector storage | 16,000 non-zeros per value | `ERROR` at `INSERT`. Unreachable: `sparse.max-terms` prunes a chunk to 1,000, and the seeded corpus peaks at 666. 1,000 is also pgvector's HNSW ceiling, kept on purpose. |
+| Exact vector scans | ~50,000 chunks | The crossover to the [HNSW indexes](operating-notes.md#there-is-deliberately-no-ann-index) for either column; the large-corpus search rows show why. |
+| Synchronous ingest | 5 s p99 | Reached: at the cap a document now costs 6.5 s with two models per chunk (from 2.3 s with one), so the background job is the next change to ingest, not a threshold ahead of it. |
+| Machine memory | 2 GB floor | A 1 GB limit is OOM-killed two documents into seeding; under 2 GB the api container settles at 1.37 GiB after seeding and 1.52 GiB after a 99 KB ingest. JVM plus two ONNX Runtime sessions and their native arenas — the sparse model's logits tensor alone is 27 MiB per chunk, held twice while it is pooled. Sized for in [Deploying it](../README.md#deploying-it). |
 
 The 100,000-character cap itself is provenance plus headroom: the brief's clarification put the
 average document at about 10 KB, so the cap is 10× the stated corpus while staying under both

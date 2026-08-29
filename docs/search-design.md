@@ -52,7 +52,7 @@ Queries shorter than three alphanumeric characters drop the fuzzy arm and keep o
 arm: trigram similarity over one or two characters is noise, and would return an arbitrary slice of
 the client list.
 
-## Documents: two retrievers
+## Documents: three retrievers
 
 **Lexical.** A stored `tsvector` with `setweight` (title A, content B), queried with
 `websearch_to_tsquery` and ranked with `ts_rank_cd`. This is what finds rare exact tokens that
@@ -90,10 +90,11 @@ The seeded reports run to 22 chunks each, so two or three of them fill a chunk-s
 what does not fit is not ranked low — it is not ranked at all. The documents most easily squeezed
 out are the short ones, and the electricity bill this page is largely about is three chunks long.
 The failure is invisible from the outside, which is the argument for not writing it that way:
-nothing distinguishes "no good match" from "never looked". Both arms are therefore cut to the same
-depth in the same unit, since fusion combines them as rankings — the semantic arm applies the number
-once per expansion probe and then keeps each document's best score, so an expanded query carries
-more than 30 into the floors. `DocumentSearchRepositoryTest` pins the semantics.
+nothing distinguishes "no good match" from "never looked". All three arms are therefore cut to the
+same depth in the same unit, since fusion combines them as rankings — the semantic arm applies the
+number once per expansion probe and then keeps each document's best score, so an expanded query
+carries more than 30 into the floors. `DocumentSearchRepositoryTest` pins the semantics for both
+learned arms.
 
 The formulation matters as much as the semantics, and it is not obvious which way. Three ways to
 write "one row per document", timed with `EXPLAIN ANALYZE`, median of five warm runs on the seeded
@@ -104,8 +105,9 @@ corpus and on the same corpus grown to the large scale of [load and limits](load
 | Nearest 50 chunks, collapsed afterwards — bounded by chunks, so it starves | 0.87 ms | 100 ms |
 | `DISTINCT ON (document_id)` over the whole table | 0.73 ms | 424 ms |
 | `min()` per document, text fetched for the survivors — shipped | 0.85 ms | 244 ms |
+| The same `min()` per document over the sparse column with `<#>` | 1.2–2.6 ms | ~420 ms |
 
-At the corpus that ships, all three are the same query. At the large corpus `DISTINCT ON` is the one
+At the corpus that ships, all four are the same query. At the large corpus `DISTINCT ON` is the one
 that is genuinely more expensive: it sorts every chunk in the corpus, where `min()` groups them
 through a hash table and only the thirty survivors ever pay for their text. (A `CROSS JOIN LATERAL`
 per document — the shape that reads most naturally — was measured too, and is the worst of the four
@@ -138,6 +140,84 @@ Two traps worth naming, both covered by tests:
   text satisfies a wordpiece budget while being a useless chunk. The chunker applies a character
   ceiling as well.
 
+### Sparse: learned term weights
+
+The third arm is SPLADE-style *learned sparse* retrieval. A masked-language-model encoder reads each
+chunk and, instead of a 384-dimensional point, emits a weight for every one of the 30,522 WordPiece
+vocabulary terms the chunk states or implies — most of them zero. Per term `j`:
+
+```
+w_j = log(1 + max(0, max over unmasked positions i of logit_ij))      then the five special-token ids are zeroed
+```
+
+The maximum over positions and the `log(1 + relu(·))` are the published pooling; because both
+functions are monotone, the code takes the maximum of the raw logits first and applies the transform
+once per term — 30,522 transcendental calls per chunk instead of sequence × 30,522, and the same
+vector to the last bit. The result is stored beside the dense vector as a pgvector `sparsevec(30522)`,
+8 bytes per non-zero plus 16; on the seeded corpus a chunk activates 145 to 666 terms (median 278),
+so a sparse vector is about 2.3 kB against the dense vector's 1.5 kB.
+
+The checkpoint is `opensearch-neural-sparse-encoding-doc-v2-mini`, an *inference-free* model: only
+documents go through the encoder. A query is its distinct wordpieces, each weighted from the
+checkpoint's frozen IDF table (`the` 0.135, `address` 4.89, `electricity` 6.12), and the score is the
+plain inner product — `q · w`, unnormalised, because that is what the model was trained against.
+So searching costs a table lookup and one more exact scan; no second forward pass. Both models
+share the bert-base-uncased vocabulary entry for entry, which is what lets one tokenizer and one
+chunker serve both — `TokenizerParityTest` proves it on text and startup re-checks it on the files.
+
+The SQL is the semantic arm's with `<#>`, pgvector's *negative* inner product, so `min()` is the best
+chunk and its negation the score:
+
+```sql
+WITH best AS (
+    SELECT document_id, min(sparse_embedding <#> CAST(:vector AS sparsevec)) AS distance
+    FROM document_chunks GROUP BY document_id
+    HAVING min(sparse_embedding <#> CAST(:vector AS sparsevec)) < 0
+    ORDER BY distance, document_id LIMIT 30)
+SELECT d.id, …, nearest.content AS snippet, -best.distance AS score …
+```
+
+The `HAVING` matters: a document sharing no term with the query sits at exactly zero and would
+otherwise fill the shortlist in id order, so an empty sparse result means "nothing shares a term
+with this", not "thirty ties". Before any floor sees it, the score is divided by the query's own mass
+(the sum of its IDF weights), which turns it into the average learned weight the best chunk gives the
+query's terms and puts a two-word and a six-word query on one scale.
+
+**Why this checkpoint.** Every `naver/*` SPLADE checkpoint is CC-BY-NC-SA and two are gated, which
+rules the whole family out for a public project, so two Apache-2.0 candidates were measured on the
+seeded corpus with `SparseModelExperiment` (opt-in, like the dense one), each ranking all 20
+documents for the golden queries with the sparse arm alone:
+
+| Checkpoint | hit@5 / MRR alone | nonsense best vs weakest true positive | ms per chunk | query side | size |
+| --- | --- | --- | --- | --- | --- |
+| `opensearch-neural-sparse-encoding-doc-v2-mini` | 17/18, 0.802 | **0.129 vs 0.179** — a clean gap | 22 | IDF lookup, 0 ms | 138 MB |
+| `Splade_PP_en_v1` (symmetric BERT-base) | 17/18, 0.865 | **0.343 vs 0.208** — overlap | 89 | MLM pass, 4–9 ms per probe | 532 MB |
+
+The symmetric model scores higher alone because it expands queries as well as documents — and that
+is exactly what lets nonsense through: "zzzqqq nonsense token" expands onto terms the corpus has,
+and no absolute floor separates it from real answers without cutting them. The inference-free model
+keeps the gap this whole design relies on ("a query with no plausible answer returns nothing"), at a
+quarter of the ingest cost and a quarter of the size. Its ONNX export comes from a third-party
+mirror whose weights, tokenizer and IDF table are byte-identical to the official repository's;
+`SparseEncoderTest` pins the encoder's output for one sentence to the values the official PyTorch
+checkpoint produces, to three decimals, so the export is trusted because it was checked.
+
+**What the arm adds, and what it does not.** Full-text search ANDs the query's terms, so
+"electricity supplier statement" finds nothing — `supplier` is absent. The sparse arm scores the two
+terms that are there and ranks the bill first. "double taxation treaty" reaches a chunk that only
+says "double taxation *agreement*", because the encoder put `treaty` (0.35) and `agreement` (0.66)
+into that chunk's expansion. The lexical arm stays authoritative on reference codes: WordPiece splits
+`PLC-88213` into `plc`, `-`, `88`, `##21`, `##3`, and the policy schedule wins on those pieces, but a
+trust deed that merely says "plc," scores a third as much, which is what the relative floor is for.
+And it does not fix the brief's example: the bill's chunks carry `address` at 0.53 and `utility` at
+0.28, but nothing the query "address proof" can connect to — the arm ranks the bill fourth, one place
+better than the dense model, still behind the onboarding checklist. The lexicon stays.
+
+Running the lexicon's probes through this arm as well was measured and rejected: no golden rank
+changed, but a two-word probe like "bank statement" is a strong partial match for most of the corpus,
+so "address proof" carried fifteen sparse candidates into fusion instead of three and the page grew
+from four documents to ten. Expansion widens the semantic arm only.
+
 ## Why the task's own example needs more than a model
 
 The brief asks that "address proof" return documents containing "utility bill". Measured on this
@@ -161,7 +241,9 @@ and query prefix, ranking all 20 documents per probe. The rank of the electricit
 
 Every model ranked every other probe — "retirement income planning", "share options vesting",
 "who can act for a client if they lose capacity" and two more — first. All five failed the same
-single case in the same way. (`ModelSelectionExperiment` reproduces this; see its header.)
+single case in the same way. (`ModelSelectionExperiment` reproduces this; see its header.) The
+learned sparse model added later does no better in kind: it ranks the bill fourth for "address proof",
+on the strength of the word "address" in its own text, and knows nothing of "proof".
 
 That is not a model quality problem. "An electricity bill can evidence where you live" is
 **procedural knowledge about a domain**, not a distributional fact about English, and a model
@@ -175,7 +257,9 @@ maximum rather than blending the probes into one vector matters — averaging "a
 "utility bill" produces a vector that is a weaker match for both than either is alone.
 
 Expansion widens the **semantic arm only**. The lexical arm's value is precision on exact tokens,
-and OR-ing extra phrases into it would trade that away for recall the semantic arm already provides.
+and OR-ing extra phrases into it would trade that away for recall the semantic arm already provides;
+the sparse arm was measured with the probes and without, and they changed no rank — only how long
+the page was ([above](#sparse-learned-term-weights)).
 
 It is not free: the probes are embedded together as one padded batch (one transformer forward pass,
 not five), but each probe is still its own vector scan, so an expanded query takes about 50 ms
@@ -189,38 +273,62 @@ type at ingest. What it should *not* come from is hoping a bigger model has it.
 
 ## Fusion
 
-The two document rankings are combined with reciprocal rank fusion — `1/(k + rank)`, `k = 60` —
+The three document rankings are combined with reciprocal rank fusion — `1/(k + rank)`, `k = 60` —
 from Cormack, Clarke and Buettcher (SIGIR 2009), and the default hybrid combiner in Elasticsearch,
 OpenSearch and Azure AI Search. It combines *rankings* rather than scores, which is the point:
-`ts_rank_cd` and cosine similarity are on unrelated scales, and no fixed weighting between them
-survives a change of corpus. A document both retrievers rank outscores one that a single retriever
-ranks highly, so agreement between lexical and semantic evidence wins. It is 20 lines of Kotlin with
-unit tests that check the arithmetic by hand (`1/61`; `1/65 + 1/68`).
+`ts_rank_cd`, an inner product and a cosine are on unrelated scales, and no fixed weighting between
+them survives a change of corpus. A document several retrievers rank outscores one that a single
+retriever ranks highly, so agreement between kinds of evidence wins. It is 20 lines of Kotlin with
+unit tests that check the arithmetic by hand (`1/61`; `1/65 + 1/68`; `1/65 + 1/68 + 1/70`).
+
+A third list changes what agreement is worth, and the change is pinned rather than hoped past: two
+tenth places (`2/70`) now beat a first place in one list (`1/61`). Since the lexical and the sparse
+arm both reward literal tokens, that is the trade — a document two arms half-like can outrank one
+the semantic arm alone is sure of. `SearchArmAblationTest` measures it on the golden document queries
+by fusing every combination of the floored arms:
+
+| Arms | hit@5 | MRR |
+| --- | --- | --- |
+| keyword | 13/21 | 0.619 |
+| sparse | 18/21 | 0.807 |
+| semantic | 20/21 | 0.825 |
+| keyword + semantic — the two-arm system | 21/21 | 0.810 |
+| keyword + sparse | 18/21 | 0.807 |
+| **keyword + sparse + semantic** | **21/21** | **0.859** |
+| … with the lexicon's probes through the sparse arm too | 21/21 | 0.859 |
+
+No query the two arms hit is lost, and the mean reciprocal rank rises because agreement is now
+three-way: "who can act for a client if they lose capacity" and "inheritance tax on gifts" move from
+second or third to first when the sparse list confirms the semantic one.
 
 Two consequences that shaped the code:
 
 - **Relevance cut-offs must be applied before fusion.** Once a score has become a rank, "not similar
-  enough" is no longer expressible, so both arms are filtered while their numbers still exist. See
+  enough" is no longer expressible, so every arm is filtered while its numbers still exist. See
   [Calibrating the cut-offs](#calibrating-the-cut-offs).
 - **Clients are not in the fusion.** A client can never appear in a document ranking, so an exact
   email match would be permanently capped at `1/61` and would lose to an average document that
   happened to appear in both lists. Hence the [two blocks](../README.md#api).
 
 Exact ties are common — two documents that place equally in different lists score identically — and
-are broken by evidence first (a lexical hit is a fact, a semantic hit is an estimate), then by
-title, and only then by the primary key, which is there to make the order stable rather than to mean
-anything. Ranking *on* the id was the bug: deployments do not share ids, so results reordered
+are broken by agreement first, then by the most literal evidence (a lexical hit is a fact, the token
+is in the document; a sparse hit is the token or a learned expansion of it in a chunk; a semantic hit
+is an estimate), then by title, and only then by the primary key, which is there to make the order
+stable rather than to mean anything. Ranking *on* the id was the bug: deployments do not share ids, so results reordered
 between one install and the next. It was caught by running the evaluation twice.
 
 ## Evaluation
 
-`golden-queries.json` holds 25 queries an advisor might type, each with the one result that must come
+`golden-queries.json` holds 28 queries an advisor might type, each with the one result that must come
 back. `SearchQualityTest` asserts every one lands in the top five and prints mean reciprocal rank, so
-a change that keeps every query passing while pushing results down the list is still visible.
+a change that keeps every query passing while pushing results down the list is still visible. Three
+document queries were added with the sparse arm, each a partial-term query the lexical AND cannot
+answer ("electricity supplier statement" — `supplier` is absent); on the original eighteen the
+two-arm system scored 0.778 and the three-arm one 0.835.
 
 | Set | Queries | hit@5 | MRR |
 | --- | --- | --- | --- |
-| Documents | 18 | 18/18 | 0.778 |
+| Documents | 21 | 21/21 | 0.859 |
 | Clients | 7 | 7/7 | 0.929 |
 
 The single client query not at rank 1 is "retired teacher", which ties a retired *teacher* with a
@@ -231,9 +339,9 @@ the behaviour I chose, not against being wrong about what advisors actually sear
 
 ## Calibrating the cut-offs
 
-Both retrievers get a relevance floor before fusion, and neither is a single absolute number,
-because neither score has a calibrated scale across queries. Both thresholds were measured on this
-corpus rather than picked.
+Every retriever gets a relevance floor before fusion, and none is a single absolute number, because
+none of the scores has a calibrated scale across queries. All of the thresholds were measured on
+this corpus rather than picked.
 
 **The absolute cosine floor answers "can the corpus answer this at all?"** My first attempt was to
 make it a relevance judgement too, and the measurement says that cannot work:
@@ -265,6 +373,21 @@ document's *position* in a list, not how weak it was, so without the floor a 180
 lexical match arrives at fusion as a first-place finish.
 
 `SemanticFloorTest` asserts both semantic properties and prints the table.
+
+**The sparse floors are on the inner product divided by the query's mass** — an unbounded score in
+the model's own units has no absolute floor until it is put on a per-query scale, and the average
+learned weight a chunk gives the query's terms is one. Measured with `SparseFloorTest`:
+
+| Measurement | Value |
+| --- | --- |
+| Nonsense queries, best document | 0.129, 0.093, 0.086 |
+| Weakest genuine answer ("energy performance certificate" → the buy-to-let review) | 0.179 |
+| Incidental one-term overlap ("plc," in the trust deed, against `PLC-88213`) | 0.32 of the best |
+| Genuine secondary matches, as a share of the best | 0.53 and up |
+
+So the absolute floor is **0.15**, between the nonsense peak and the weakest real answer, and the
+relative floor is **0.45**, between an incidental overlap and a genuine secondary match. Both move if
+the checkpoint does, which is why `sparse.model-id` is recorded on every chunk row.
 
 The principled fix for the absolute floor's overlap is a cross-encoder re-ranker over the fused top
 20, which scores query and document *together* and is calibrated in a way a bi-encoder cosine is not.

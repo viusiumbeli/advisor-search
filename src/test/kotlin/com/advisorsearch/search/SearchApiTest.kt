@@ -57,6 +57,30 @@ class SearchApiTest(
     }
 
     @Test
+    fun `document hits name the retrievers that found them`() {
+        val arms = setOf("keyword", "sparse", "semantic")
+
+        listOf("address proof", "PLC-88213", "trustee duties", "double taxation treaty").forEach { query ->
+            val hits = search(query).filter { it["type"] == "document" }
+            assertTrue(hits.isNotEmpty(), "expected document hits for '$query'")
+            hits.forEach { hit ->
+                val matchedOn = hit["matched_on"] as String
+                val sources = (hit["sources"] as List<*>).map { it as String }
+                assertTrue(sources.isNotEmpty() && sources.all { it in arms }, "sources must name retrievers, got $sources")
+                assertEquals(sources.distinct(), sources, "a retriever is listed once")
+                if (sources.size > 1) assertEquals("multiple", matchedOn) else assertEquals(sources.single(), matchedOn)
+            }
+        }
+    }
+
+    @Test
+    fun `a reference code still puts the policy schedule first`() {
+        val titles = search("PLC-88213").filter { it["type"] == "document" }.map { title(it) }
+
+        assertTrue(titles.first().contains("Policy Schedule"), "got $titles")
+    }
+
+    @Test
     fun `a blank query is rejected as problem json`() {
         // Rendered by built-in method validation on the @NotBlank controller parameter.
         mockMvc.get("/search") { param("q", "   ") }.andExpect {

@@ -32,10 +32,15 @@ data class ClientHit(
     override val type: String = "client"
 }
 
-@JsonPropertyOrder("type", "score", "matched_on", "snippet", "document")
+/**
+ * `matched_on` names the one retriever that found the document, or `multiple`; `sources` always
+ * lists them, most literal first, so a caller can see which arms agreed without parsing a label.
+ */
+@JsonPropertyOrder("type", "score", "matched_on", "sources", "snippet", "document")
 data class DocumentHit(
     override val score: Double,
     override val matchedOn: String,
+    val sources: List<String>,
     val snippet: String,
     val document: DocumentReference,
 ) : SearchHit {

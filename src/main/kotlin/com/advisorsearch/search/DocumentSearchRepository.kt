@@ -1,5 +1,7 @@
 package com.advisorsearch.search
 
+import com.advisorsearch.embedding.SparseVector
+import com.advisorsearch.support.toSparseVectorLiteral
 import com.advisorsearch.support.toVectorLiteral
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.simple.JdbcClient
@@ -71,7 +73,10 @@ class DocumentSearchRepository(
      * The measurements are in docs/search-design.md.
      *
      * The scan stays exact rather than approximate — see docs/operating-notes.md, "There is
-     * deliberately no ANN index".
+     * deliberately no ANN index". The shortlist's ORDER BY carries the document id as a tiebreaker:
+     * exactly equal distances are rare for real vectors but routine once a corpus holds copies, and
+     * without it which of the tied documents survive the LIMIT is whatever order the aggregate
+     * happened to produce.
      */
     fun semanticSearch(
         queryVector: FloatArray,
@@ -84,7 +89,7 @@ class DocumentSearchRepository(
                     SELECT document_id, min(embedding <=> CAST(:vector AS vector)) AS distance
                     FROM document_chunks
                     GROUP BY document_id
-                    ORDER BY distance
+                    ORDER BY distance, document_id
                     LIMIT :candidates
                 )
                 SELECT d.id, d.client_id, d.title, d.created_at,
@@ -102,6 +107,52 @@ class DocumentSearchRepository(
                 ORDER BY best.distance, d.id
                 """.trimIndent(),
             ).param("vector", queryVector.toVectorLiteral())
+            .param("candidates", candidateDocuments)
+            .query(documentMatchRowMapper)
+            .list()
+
+    /**
+     * The sparse arm: the semantic arm's shape over learned term weights. `<#>` is pgvector's NEGATIVE
+     * inner product, because index scans are ascending, so min() of it is a document's best chunk and
+     * the score is its negation. A document sharing no term with the query sits at exactly 0 and would
+     * otherwise fill the shortlist in id order — the HAVING keeps them out, so an empty result means
+     * "nothing shares a term with this query" rather than "thirty ties". The score comes back in the
+     * model's own units; the caller divides it by the query's mass before any floor sees it.
+     *
+     * Its scan is not the dense arm's with a different operator: sparsevec is stored out of line, so
+     * every chunk is detoasted on the way past, and the merge is scalar where the dense kernel is
+     * vectorised. Measured in docs/load-and-limits.md.
+     */
+    fun sparseSearch(
+        queryVector: SparseVector,
+        candidateDocuments: Int,
+    ): List<DocumentMatch> =
+        jdbc
+            .sql(
+                """
+                WITH best AS (
+                    SELECT document_id, min(sparse_embedding <#> CAST(:vector AS sparsevec)) AS distance
+                    FROM document_chunks
+                    GROUP BY document_id
+                    HAVING min(sparse_embedding <#> CAST(:vector AS sparsevec)) < 0
+                    ORDER BY distance, document_id
+                    LIMIT :candidates
+                )
+                SELECT d.id, d.client_id, d.title, d.created_at,
+                       nearest.content AS snippet,
+                       -best.distance AS score
+                FROM best
+                JOIN documents d ON d.id = best.document_id
+                JOIN LATERAL (
+                    SELECT content
+                    FROM document_chunks
+                    WHERE document_id = best.document_id
+                    ORDER BY sparse_embedding <#> CAST(:vector AS sparsevec), id
+                    LIMIT 1
+                ) nearest ON true
+                ORDER BY best.distance, d.id
+                """.trimIndent(),
+            ).param("vector", queryVector.toSparseVectorLiteral())
             .param("candidates", candidateDocuments)
             .query(documentMatchRowMapper)
             .list()

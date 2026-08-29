@@ -24,7 +24,10 @@
     { "query": "energy performance certificate", "expect": "Buy-to-Let Portfolio Review", "why": "an obligation mentioned once, not in the title" },
     { "query": "double taxation treaty", "expect": "CRS Tax Residency", "why": "the document says 'double taxation agreement', so only the semantic arm can reach it" },
     { "query": "ISA transfer", "expect": "ISA Transfer Confirmation", "why": "exact title tokens" },
-    { "query": "break clause", "expect": "Assured Shorthold Tenancy", "why": "a specific clause inside a summary" }
+    { "query": "break clause", "expect": "Assured Shorthold Tenancy", "why": "a specific clause inside a summary" },
+    { "query": "electricity supplier statement", "expect": "Electricity Account Statement", "why": "'supplier' is absent, so the lexical AND finds nothing; the sparse arm scores the two terms that are there" },
+    { "query": "meter readings kWh unit rate", "expect": "Electricity Account Statement", "why": "several weak lexical terms that the sparse arm's learned weights add up" },
+    { "query": "tax agreement between two countries", "expect": "CRS Tax Residency", "why": "a paraphrase; 'countries' and 'agreement' are learned expansions of the chunk" }
   ],
   "clients": [
     { "query": "AldgateWealth", "expect": "jane.roe@aldgatewealth.example", "why": "the task's own example: a substring of the email domain" },

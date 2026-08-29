@@ -120,7 +120,7 @@ class DocumentApiTest(
     }
 
     @Test
-    fun `every chunk of a long document records the configured model`() {
+    fun `every chunk of a long document records both configured models`() {
         val clientId = createClient()
         val paragraphs =
             (1..40).joinToString("\n\n") {
@@ -145,6 +145,12 @@ class DocumentApiTest(
                 .param("id", documentId)
                 .query(String::class.java)
                 .list()
+        val sparseModels =
+            jdbc
+                .sql("SELECT DISTINCT sparse_model FROM document_chunks WHERE document_id = :id")
+                .param("id", documentId)
+                .query(String::class.java)
+                .list()
         val chunks =
             jdbc
                 .sql("SELECT count(*) FROM document_chunks WHERE document_id = :id")
@@ -154,6 +160,7 @@ class DocumentApiTest(
 
         assertTrue(chunks > 1, "expected the long document to be split, got $chunks chunk(s)")
         assertEquals(listOf("all-MiniLM-L6-v2"), models)
+        assertEquals(listOf("opensearch-neural-sparse-encoding-doc-v2-mini"), sparseModels)
     }
 
     @Test
