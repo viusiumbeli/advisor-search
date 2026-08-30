@@ -264,7 +264,7 @@ both than either is alone.
 applies. The first version decided by substring: a query expanded only if it literally contained one
 of a concept's phrases, so "something official with her home address on it" never reached the address
 rule at all, and 2 of the 21 golden document queries expanded. Now each rule's phrasings and its
-concept name are embedded once at startup with the dense model, together with its expansions (142
+concept name are embedded once at startup with the dense model, together with its expansions (144
 short texts, 0.3–0.6 s across two container starts). A query is embedded once, inside the expander, and that vector is also what
 the semantic arm scans with; a rule's score is the cosine to its nearest phrasing, and a rule fires
 when that score clears an absolute floor and stays within a ratio of the best rule's:
@@ -366,7 +366,7 @@ rule; an official copy of the Land Registry register says "proprietor" and "titl
 | --- | --- | --- | --- |
 | Identity of the customer | MLR 2017 reg 28(2); JMLSG 5.3.75 | passport ("Type P", MRZ), photocard licence ("DVLA"), national identity card — never "identity" | yes |
 | Residential address | JMLSG 5.3.75, 5.3.76 (5.3.112: address *or* date of birth) | bills and statements carry an address, never "proof of address" | yes |
-| Source of funds and wealth | JMLSG 5.5.32, 5.5.6 | a completion statement says "net proceeds of sale", a will "residue", a grant of probate "administration of the estate" | yes |
+| Source of funds and wealth | JMLSG 5.5.32, 5.5.6, Annex 5-III/IV | a completion statement says "net proceeds of sale", a will "residue", a grant of probate "administration of the estate", a death certificate "entry of death" | yes |
 | Beneficial ownership; ownership and control structure | MLR reg 28(4), reg 5 (over 25 % of shares or votes); Companies Act 2006 Part 21A | a PSC register says "nature of control" and "shares", a register of members "shares held", a confirmation statement "shareholder information" — never "beneficial owner" (the gap is on that phrase; reg 28(4)(c)'s "ownership and control" the PSC register half-carries) | yes |
 | Authority to act for the customer | MLR reg 28(10); JMLSG 5.3.99–5.3.101; MCA 2005 s.9, s.16; Powers of Attorney Act 1971 | an LPA says "donor" and "attorney", a general power "I appoint … to be my attorney", a court order "deputy" (and "lacks capacity", so the capacity phrasings reach it unaided), a grant of probate "executors" — none says "authorised to act"; a letter of authority or mandate does ("I authorise"), and needs no rule | yes, for the instruments |
 | Income | COBS 9A.2.7R; MCOB 11.6.8R, 11.6.9G, 11.6.13G(1), 11.6.15G(2) | a payslip says "gross pay", a P60 "pay in this employment" (and "Income Tax"), a statement "BACS … SALARY" — the gap is real for the payslip and the statement, partial for the P60, absent for a tax return, which says "income" | yes |
@@ -384,6 +384,8 @@ rule; an official copy of the Land Registry register says "proprietor" and "titl
 | Safeguarded pension benefits | COBS 19.1 | the statement says "safeguarded benefits", "cash equivalent transfer value" | no — "CETV" is a lexical-arm abbreviation gap, stated |
 | Existing protection policies | practice | a policy schedule says "sum assured", "policy" | no — the removed life-cover rule |
 | Independence of the source; no self-certification of income | MLR reg 28(18); MCOB 11.6.8R(2) | a standard on every list, not a document class: a client's own declaration never belongs on the income rule | constraint, not a rule |
+| Affordability of any guarantor | MCOB 11.6.2R ("the customer (and any guarantor…)") | the guarantor's evidence is the income rule's documents in another name; a deed of guarantee is titled with the requirement | no |
+| Evidence that the client understands transfer risks | COBS 19.1.1CR(5), 19.1.9AR | the firm's own record; no document type | no |
 | PEP and sanctions status; electronic verification | JMLSG 5.5, 5.3.48 | screening and verification reports carry the requirement's words | no |
 
 **The eleven rules, their sources and their order.** Expansions are the document types a UK adviser's
@@ -395,11 +397,11 @@ vector scan (about 7 ms) per probe.
 
 | Rule (phrasings) | Source | Expansions in order — the first four run |
 | --- | --- | --- |
-| evidence of address (7) | JMLSG 5.3.75 "Current council tax demand letter, or statement", "Recent evidence of entitlement to a state or local authority-funded benefit" (the DWP's document is an award letter); 5.3.76 "current bank statements … or utility bills"; the firm's checklist (mortgage statement, HMRC correspondence); Onfido (tenancy) | utility bill; bank statement; council tax bill; mortgage statement — benefit award letter; HMRC correspondence; tenancy agreement |
+| evidence of address (7) | JMLSG 5.3.75 "Current council tax demand letter, or statement", "Recent evidence of entitlement to a state or local authority-funded benefit" (the DWP's document is an award letter); 5.3.76 "current bank statements … or utility bills", and a staff record of a home visit as corroboration; the firm's checklist (mortgage statement, HMRC correspondence — the checklist's own name, kept as adviser wording); Onfido (tenancy) | utility bill; bank statement; council tax bill; mortgage statement — benefit award letter; HMRC correspondence; tenancy agreement; record of a home visit |
 | evidence of identity (8) | 5.3.75 "Valid passport", "Valid photocard driving licence (full or provisional)", "National Identity card", "Firearms certificate or shotgun licence"; 5.3.90 "requiring copy documents to be certified by an appropriate person" | passport; driving licence; national identity card; certified copy of identity document — firearms certificate |
 | evidence of income (6) | MCOB 11.6.13G(1) "payslips and bank statements"; 11.6.9G(5) "payslips, bank statements or tax returns"; 11.6.15G(2) "a pension statement"; gov.uk on the P60 ("as proof of your income if you apply for a loan or a mortgage"); lender practice (employment contract) | payslip; bank statement; pension statement; P60 end of year certificate — tax return; employment contract |
 | authority to act for another person (9) | MLR reg 28(10); MCA s.9 ("registered in accordance with Schedule 1"), s.16(2)(b) ("deputy"); gov.uk ("you'll get a court order"; EPAs "made and signed before October 1, 2007 can still be used"); JMLSG 5.3.75 (grant of probate); Powers of Attorney Act 1971 (the general power, for a donor who has capacity) | lasting power of attorney; enduring power of attorney; court order appointing a deputy; grant of probate — general power of attorney |
-| source of funds and source of wealth (5) | JMLSG 5.5.32 "a copy of the relevant will", "evidence of conveyancing"; 5.5.6 "inheritance, divorce settlement, property sale"; Annex 5-III/IV "VAT and income tax returns, copies of audited accounts, pay slips, public deeds" | completion statement from a property sale; copy of the will; grant of probate; divorce settlement consent order — audited accounts; tax return; payslip |
+| source of funds and source of wealth (5) | JMLSG 5.5.32 "a copy of the relevant will", "evidence of conveyancing"; 5.5.6 "inheritance, divorce settlement, property sale"; Annex 5-III/IV "VAT and income tax returns, copies of audited accounts, pay slips, public deeds" | completion statement from a property sale; copy of the will; grant of probate; financial remedy consent order — death certificate; audited accounts; tax return; payslip |
 | beneficial ownership of a company or trust (6) | MLR reg 28(4)(a)–(c), reg 5; Companies Act 2006 Part 21A | Companies House confirmation statement; shareholder register; register of people with significant control; trust deed |
 | evidence of property ownership (6) | gov.uk on the title register and plan; conveyancing practice | Land Registry title register; title plan; title deeds |
 | evidence of assets (6) | COBS 9A.2.7R "their assets, including liquid assets, investments and real property" | investment portfolio valuation; ISA statement; savings account statement; pension statement — property valuation report; share certificate; Land Registry title register; endowment policy statement |
@@ -423,22 +425,23 @@ puts the two rules at 0.31.
 **How a probe is proved right: the held-out fixtures.** The seed corpus is twenty documents and lacks
 most of these types — no payslip, no passport, no court order, no title register — so "the probe reaches
 nothing seeded" says nothing about the probe. `EvidenceFixtureTest` holds one short synthetic document
-per type the seed lacks (43 of them under `src/test/resources/fixtures/evidence`, each written the way
+per type the seed lacks (45 of them under `src/test/resources/fixtures/evidence`, each written the way
 the real document reads: a payslip's fields, a court order's "IT IS ORDERED THAT", a register's
 "PROPRIETOR"), ingests them through the real path inside a transaction that rolls back — they are never
 seeded into the demo — and asserts that every expansion places its own document on the semantic arm's
-page (the absolute floor, then 0.70 of the best hit). Sixty-five probe checks over forty-six document
-types (a type on several rules is checked on each); sixty-two place their document, fifty of them at
-rank 1. The one type that misses is listed, not tuned around: `pension statement` — MCOB's own name for the
+page (the absolute floor, then 0.70 of the best hit). Sixty-seven probe checks over forty-eight document
+types (a type on several rules is checked on each); sixty-four place their document, fifty-one of them
+at rank 1. The one type that misses is listed, not tuned around: `pension statement` — MCOB's own name for the
 document — scores the seeded scheme statement 0.46 and *Suitability Report: Pension Consolidation* 0.68,
 and the relative floor cuts the statement; a near-synonym title outranks the real thing, which is the
-semantic arm's limit rather than the probe's. Three wordings changed on this test and none on seed
-reach: `register of members` (the Companies Act's name) scored 0.33 against its own register and became
+semantic arm's limit rather than the probe's. Four wordings changed on this test or on the document's own name, none on seed
+reach: the divorce document is the court's "financial remedy consent order"; `register of members` (the Companies Act's name) scored 0.33 against its own register and became
 the adviser's `shareholder register` (0.46); `service charge demand` lost its page to the adviser's own
 fee schedule and became MCOB's `ground rent and service charge demand` (0.61); and a `birth certificate`
 probe could not place a birth certificate, whose own words are "certified copy of an entry" — a document
 type that never names itself, recorded because the gap test cannot see it. `HMRC correspondence` passes
-narrowly (rank 9 of 9 at 0.32): the coding notice is a letter like many others.
+narrowly (rank 9 of 9 at 0.32): it is the checklist's own name for a genre rather than a document, and
+the coding notice the fixture picks is a letter like many others.
 
 **What the seed does and does not decide.** The seed is a smoke test: the brief's two examples work
 ("address proof" and "proof of address" return the bill, fifth, behind four documents that also state

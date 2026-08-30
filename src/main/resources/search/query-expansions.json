@@ -61,7 +61,9 @@
     "of attorney under the Powers of Attorney Act 1971, whose form appoints an attorney without the word 'authority'. Source",
     "of funds and wealth: JMLSG 5.5.32 — 'a copy of the relevant will', 'evidence of conveyancing' — 5.5.6 —",
     "'inheritance, divorce settlement, property sale' — and Annex 5-III/IV, which verifies wealth 'by reference to VAT",
-    "and income tax returns, copies of audited accounts, pay slips, public deeds'. Beneficial ownership: MLR 2017 reg 28(4) —",
+    "and income tax returns, copies of audited accounts, pay slips, public deeds'; the death certificate that opens",
+    "an estate file is adviser practice, not text. A record of a home visit is on the address rule because JMLSG",
+    "5.3.76 says a staff record of one may corroborate residence. Beneficial ownership: MLR 2017 reg 28(4) —",
     "'identify the beneficial owner' and 'understand the ownership and control structure' — and reg 5's",
     "'more than 25% of the shares or voting rights'; the register of people with significant control is",
     "Companies Act 2006 Part 21A. Property ownership: lender and conveyancing practice; gov.uk describes",
@@ -89,6 +91,10 @@
     "list (18 of the 78 document types in its public API specification) accepts, and takes a national",
     "identity card 'issued by an EEA state' only, a restriction 5.3.77 allows. Two firms reading the same",
     "text produce two lists; this file holds one firm's.",
+    "Two requirements enumerated and rejected that no list carries: MCOB 11.6.2R assesses whether 'the customer (and",
+    "any guarantor' can pay — a guarantor's evidence is the income rule's documents in another name, and a deed",
+    "of guarantee is titled with the requirement; COBS 19.1.1CR(5) wants evidence that a client understands",
+    "transfer risks, which is the firm's own record and no document type.",
     "'life cover paid on death' shipped in the first version and was removed on the texts, not on the",
     "seed: nothing in JMLSG, COBS or MCOB makes life cover an evidentiary requirement — COBS 9.2.1R's",
     "demands-and-needs test is advice content — so it encoded what a policy pays, not which document",
@@ -101,7 +107,7 @@
     {
       "concept": "evidence of address",
       "paraphrases": ["address proof", "proof of address", "address verification", "evidence of address", "residency proof", "something that shows where the client lives", "something that confirms the client's home address"],
-      "expansions": ["utility bill", "bank statement", "council tax bill", "mortgage statement", "benefit award letter", "HMRC correspondence", "tenancy agreement"]
+      "expansions": ["utility bill", "bank statement", "council tax bill", "mortgage statement", "benefit award letter", "HMRC correspondence", "tenancy agreement", "record of a home visit"]
     },
     {
       "concept": "evidence of identity",
@@ -121,7 +127,7 @@
     {
       "concept": "source of funds and source of wealth",
       "paraphrases": ["source of funds", "source of wealth", "where did the money come from", "how the money being invested was acquired", "origin of the funds"],
-      "expansions": ["completion statement from a property sale", "copy of the will", "grant of probate", "divorce settlement consent order", "audited accounts", "tax return", "payslip"]
+      "expansions": ["completion statement from a property sale", "copy of the will", "grant of probate", "financial remedy consent order", "death certificate", "audited accounts", "tax return", "payslip"]
     },
     {
       "concept": "beneficial ownership of a company or trust",

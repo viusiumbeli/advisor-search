@@ -14,7 +14,7 @@ Every number here and in [Load and limits](load-and-limits.md) was measured on a
 | --- | --- |
 | `docker compose up` from clean to healthy | 21–27 s (two runs) |
 | Application start | 4.0 s |
-| Model warm-ups at startup | 20–60 ms dense, 50–70 ms sparse; the expansion lexicon (77 phrasings and 65 expansions) embedded in 0.3–0.6 s across two starts |
+| Model warm-ups at startup | 20–60 ms dense, 50–70 ms sparse; the expansion lexicon (77 phrasings and 67 expansions) embedded in 0.3–0.6 s across two starts |
 | Seeding 20 documents through the real ingest path | 13.4 s |
 | Ingesting a 10 KB document (13 chunks) | 1.14 s: 348 ms dense, 729 ms sparse |
 | `GET /search`, one probe, warm | 17 ms median (server side 12–16 ms: the query's forward pass and lexicon match 2–4 ms, keyword 1–2 ms, sparse 1–2 ms, one semantic scan 7–9 ms) |

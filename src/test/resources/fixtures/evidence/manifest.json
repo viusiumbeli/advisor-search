@@ -103,7 +103,7 @@
       "file": "grant-of-probate.txt"
     },
     {
-      "expansion": "divorce settlement consent order",
+      "expansion": "financial remedy consent order",
       "title": "Financial remedy consent order, Family Court at Leeds",
       "file": "consent-order.txt"
     },
@@ -221,6 +221,16 @@
       "expansion": "audited accounts",
       "title": "Audited financial statements, Fenwick Advisory Partners Ltd, year ended 31 March 2026",
       "file": "audited-accounts.txt"
+    },
+    {
+      "expansion": "death certificate",
+      "title": "Certified copy of an entry of death, Margaret Ellen Fenwick",
+      "file": "death-certificate.txt"
+    },
+    {
+      "expansion": "record of a home visit",
+      "title": "File note of home visit, 8 Sedgwick Lane, 11 March 2026",
+      "file": "home-visit-record.txt"
     }
   ],
   "seeded": {
