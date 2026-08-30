@@ -193,9 +193,14 @@ it 13th to 18th, and the learned sparse model 4th, while ranking every other pro
 electricity bill can evidence
 where you live" is procedural knowledge about a domain, not a distributional fact about English, so
 it is stated explicitly in `src/main/resources/search/query-expansions.json`: five concepts, each
-with the phrases that trigger it and the phrases to also search for. A matching query runs as
-several probes — capped at five, embedded as one batch, semantic arm only — and each document keeps
-its best score across them.
+with the ways an advisor phrases the requirement and the phrases to also search for. The lexicon
+says *what* to search for; a model decides *when* it applies. Each concept's phrasings are embedded
+once at startup, and a query fires a concept when the vector the semantic arm already computed for
+it comes within a measured distance of one of them — so "something official with her home address on
+it" reaches the bill without containing any listed phrase, where the substring match this replaced
+never could. A matching query runs as several probes — capped at five, semantic arm only, the
+expansions' vectors precomputed — and each document keeps its best score across them; the model's
+say is bounded by two floors that `ConceptFloorTest` holds from both sides.
 
 The measurements behind each of these, the SQL, and how every cut-off was calibrated are in
 [search design](docs/search-design.md).
@@ -207,7 +212,7 @@ The measurements behind each of these, the SQL, and how every cut-off was calibr
 Measured on a MacBook Pro (Apple M3 Pro, 12 cores, 36 GB RAM, macOS 26.5.2) with Docker Desktop,
 against the seeded corpus of 10 clients, 20 documents and 153 chunks.
 
-`golden-queries.json` holds 28 queries an advisor might type, each with the one result that must
+`golden-queries.json` holds 33 queries an advisor might type, each with the one result that must
 come back; `SearchQualityTest` asserts every one lands in the top five and prints mean reciprocal
 rank, so results sliding down the list is visible even while every query still passes.
 `SearchArmAblationTest` fuses every combination of the three document arms and prints the same
@@ -215,12 +220,12 @@ numbers per combination, which is how the third arm earned its place.
 
 | | |
 | --- | --- |
-| Retrieval quality | documents 21/21 hit@5 (MRR 0.859; the two-arm fusion scores 0.810 on the same set), clients 7/7 (MRR 0.929) |
-| `GET /search`, warm | 30 ms median, 68 ms when a query expands to five probes — the sparse arm is about 1.3 ms of either; the rest is the semantic arm's inference and scans |
+| Retrieval quality | documents 26/26 hit@5 (MRR 0.841; 0.859 on the 21 that predate the paraphrase queries, where the two-arm fusion scores 0.810), clients 7/7 (MRR 0.929) |
+| `GET /search`, warm | 17 ms median, 45 ms when a query expands to five probes (68 before the expansions' vectors were precomputed) — the query's one forward pass and the lexicon match are about 3 ms of either, the sparse arm 1–3 ms; the rest is the semantic arm's scans, one per probe |
 | Under concurrency | p95 150 ms at 20 concurrent clients, 115 req/s |
 | Ingest | 0.93 s for a 10 KB document, 6.5 s at the 100,000-character cap — two models per chunk, and past the point at which the design says ingest should go asynchronous |
 | Exact scans | the right choice into the tens of thousands of chunks; at 99,700 the two vector columns share one TOAST relation and each arm's scan pays for both — the large-corpus story now starts with separating them |
-| Startup and tests | healthy about 25 s after `docker compose up`; 130 tests from clean in 60 s |
+| Startup and tests | healthy about 25 s after `docker compose up`; 139 tests from clean in 41 s |
 
 Sustained-load tables across three corpus scales, and the ceilings the system runs against, are in
 [load and limits](docs/load-and-limits.md); the design notes behind these numbers are in
@@ -279,6 +284,6 @@ multi-arch image that `docker compose pull` fetches, with SBOM and provenance at
 Layout: `embedding/` is the tokenizer, the two ONNX encoders and the chunker; `clients/` and
 `documents/` are the write path; `search/` holds the four retrievers — clients, and the three
 document arms — with `search/ranking/` for reciprocal rank fusion
-and `search/expansion/` for the domain lexicon; `seed/` loads the demo corpus (`seed/corpus/`)
+and `search/expansion/` for the domain lexicon and the normaliser that matches queries to it; `seed/` loads the demo corpus (`seed/corpus/`)
 through the real service layer. The two conventions the layout follows are in
 [operating notes](docs/operating-notes.md#file-organisation).

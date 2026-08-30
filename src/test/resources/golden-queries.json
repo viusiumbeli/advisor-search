@@ -27,7 +27,12 @@
     { "query": "break clause", "expect": "Assured Shorthold Tenancy", "why": "a specific clause inside a summary" },
     { "query": "electricity supplier statement", "expect": "Electricity Account Statement", "why": "'supplier' is absent, so the lexical AND finds nothing; the sparse arm scores the two terms that are there" },
     { "query": "meter readings kWh unit rate", "expect": "Electricity Account Statement", "why": "several weak lexical terms that the sparse arm's learned weights add up" },
-    { "query": "tax agreement between two countries", "expect": "CRS Tax Residency", "why": "a paraphrase; 'countries' and 'agreement' are learned expansions of the chunk" }
+    { "query": "tax agreement between two countries", "expect": "CRS Tax Residency", "why": "a paraphrase; 'countries' and 'agreement' are learned expansions of the chunk" },
+    { "query": "documents that show where the client lives", "expect": "Bank Statement", "why": "a paraphrase of the address requirement with none of the lexicon's phrasings in it: only the semantic normaliser reaches the rule; the statement carries the client's address. The electricity bill, which the expansion also reaches, is sixth here — behind the documents that state an address and two partial sparse matches" },
+    { "query": "something official with her home address on it", "expect": "Electricity Account Statement", "why": "same requirement, no shared words with the bill or the lexicon; unreachable before the normaliser" },
+    { "query": "how does she prove who she is", "expect": "Onboarding Checklist", "why": "passed on meaning alone (rank 2 before the normaliser); pinned so the identity concept firing on it never costs the rank" },
+    { "query": "who makes decisions if he can no longer manage his affairs", "expect": "Lasting Power of Attorney", "why": "passed on meaning alone (rank 1 before); pinned so the capacity concept firing on it never costs the rank" },
+    { "query": "payout when the policyholder dies", "expect": "Policy Schedule", "why": "passed on meaning alone (rank 1 before); pinned so the death-benefit concept firing on it never costs the rank" }
   ],
   "clients": [
     { "query": "AldgateWealth", "expect": "jane.roe@aldgatewealth.example", "why": "the task's own example: a substring of the email domain" },

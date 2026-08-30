@@ -1,5 +1,6 @@
 package com.advisorsearch.search
 
+import com.advisorsearch.search.expansion.ConceptMatch
 import kotlin.time.Duration
 
 data class DocumentMatch(
@@ -16,6 +17,10 @@ internal data class DocumentArms(
     val keywordTime: Duration,
     val sparseTime: Duration,
     val semanticTime: Duration,
+    /** The lexicon concepts the query reached, strongest first; empty for most queries. */
+    val concepts: List<ConceptMatch>,
+    /** Embedding the query and matching it to the lexicon: the only inference a search runs, paid here. */
+    val expansionTime: Duration,
 )
 
 /** Best match per document across the query's probes, highest score first. */

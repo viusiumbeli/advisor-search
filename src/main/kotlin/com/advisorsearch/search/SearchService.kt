@@ -52,11 +52,14 @@ class SearchService(
         val arms = documentArms(query)
         val documentHits = fuse(arms, limit)
 
-        // Each arm's own time beside its count, so the cost of a retriever is a grep away.
+        // Each arm's own time beside its count, so the cost of a retriever is a grep away — and the
+        // concepts the query reached, so an expansion is too.
         log.info(
-            "search q='{}' clients={} keyword={} ({}) sparse={} ({}) semantic={} ({}) returned={} in {}",
+            "search q='{}' clients={} concepts={} ({}) keyword={} ({}) sparse={} ({}) semantic={} ({}) returned={} in {}",
             query,
             clientHits.size,
+            arms.concepts.joinToString(prefix = "[", postfix = "]") { "${it.concept} ${it.similarity.asScore()} via '${it.phrasing}'" },
+            arms.expansionTime,
             arms.keyword.size,
             arms.keywordTime,
             arms.sparse.size,
@@ -71,21 +74,22 @@ class SearchService(
 
     /**
      * The three floored document rankings for one query: what fusion combines, and what
-     * `SearchArmAblationTest` measures one arm at a time. [expandSparse] exists for that test only —
-     * production runs the sparse arm on the bare query. Measured, the probes changed no golden rank
-     * but lengthened pages: a two-word probe like "bank statement" is a strong partial match for
-     * most of the corpus, so "address proof" carried fifteen sparse candidates into fusion instead
-     * of three.
+     * `SearchArmAblationTest` measures one arm at a time. The expander embeds the query exactly once
+     * and hands the vector on, so the semantic arm runs no inference of its own. [expandSparse] exists
+     * for that test only — production runs the sparse arm on the bare query. Measured, the probes
+     * changed no golden rank but lengthened pages: a two-word probe like "bank statement" is a strong
+     * partial match for most of the corpus, so "address proof" carried fifteen sparse candidates into
+     * fusion instead of three.
      */
     internal fun documentArms(
         query: String,
         expandSparse: Boolean = false,
     ): DocumentArms {
-        val probes = expander.expand(query)
+        val (expansion, expansionTime) = measureTimedValue { expander.expand(query) }
         val (keyword, keywordTime) = measureTimedValue { findLexically(query) }
-        val (sparse, sparseTime) = measureTimedValue { findSparsely(if (expandSparse) probes else listOf(query)) }
-        val (semantic, semanticTime) = measureTimedValue { findSemantically(probes) }
-        return DocumentArms(keyword, sparse, semantic, keywordTime, sparseTime, semanticTime)
+        val (sparse, sparseTime) = measureTimedValue { findSparsely(if (expandSparse) expansion.texts else listOf(query)) }
+        val (semantic, semanticTime) = measureTimedValue { findSemantically(expansion.vectors) }
+        return DocumentArms(keyword, sparse, semantic, keywordTime, sparseTime, semanticTime, expansion.concepts, expansionTime)
     }
 
     private fun findClients(
@@ -133,15 +137,14 @@ class SearchService(
     }
 
     /**
-     * Runs the semantic arm once per probe and keeps each document's best result across all of them.
-     * The maximum, not a blend: averaging "address proof" with "utility bill" gives a vector that
-     * matches both worse than either does alone.
+     * Runs the semantic arm once per probe vector and keeps each document's best result across all of
+     * them. The maximum, not a blend: averaging "address proof" with "utility bill" gives a vector that
+     * matches both worse than either does alone. The vectors arrive ready — the query's from its one
+     * forward pass in the expander, the expansions' from startup — so no inference happens here.
      */
-    private fun findSemantically(probes: List<String>): List<DocumentMatch> {
-        // All probes are embedded in one padded batch — one forward pass, not one per probe.
+    private fun findSemantically(vectors: List<FloatArray>): List<DocumentMatch> {
         val best =
-            embeddings
-                .embedQueries(probes)
+            vectors
                 .flatMap { vector -> documents.semanticSearch(vector, properties.candidateDocuments) }
                 .bestByDocument()
 

@@ -7,6 +7,7 @@ data class ExpansionLexicon(
 
 data class ExpansionRule(
     val concept: String,
-    val triggers: List<String>,
+    /** Example phrasings of the requirement, matched by embedding similarity rather than containment; the concept name is always one too. */
+    val paraphrases: List<String>,
     val expansions: List<String>,
 )

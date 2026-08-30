@@ -213,10 +213,12 @@ And it does not fix the brief's example: the bill's chunks carry `address` at 0.
 0.28, but nothing the query "address proof" can connect to — the arm ranks the bill fourth, one place
 better than the dense model, still behind the onboarding checklist. The lexicon stays.
 
-Running the lexicon's probes through this arm as well was measured and rejected: no golden rank
-changed, but a two-word probe like "bank statement" is a strong partial match for most of the corpus,
-so "address proof" carried fifteen sparse candidates into fusion instead of three and the page grew
-from four documents to ten. Expansion widens the semantic arm only.
+Running the lexicon's probes through this arm as well was measured and rejected: on the golden set
+as it then stood no rank changed, and a two-word probe like "bank statement" is a strong partial match
+for most of the corpus, so "address proof" carried fifteen sparse candidates into fusion instead of
+three and the page grew from four documents to ten. With the paraphrase queries added later the same
+column gains 0.02 of MRR (0.860 against 0.841) — recorded in the [fusion table](#fusion), and still
+not worth the pages; the ablation keeps printing it. Expansion widens the semantic arm only.
 
 ## Why the task's own example needs more than a model
 
@@ -251,25 +253,72 @@ trained on general text has no way to know it. Reaching for a larger model would
 budget and changed nothing.
 
 So the knowledge is stated explicitly, in `src/main/resources/search/query-expansions.json`: five
-concepts, each with the phrases that trigger it and the phrases to also search for. A query matching
-a trigger is run as several probes and each document keeps its best score across them. Taking the
-maximum rather than blending the probes into one vector matters — averaging "address proof" with
-"utility bill" produces a vector that is a weaker match for both than either is alone.
+concepts, each with the ways an advisor phrases the requirement (its *paraphrases*) and the phrases
+to also search for. A query that reaches a concept is run as several probes and each document keeps
+its best score across them. Taking the maximum rather than blending the probes into one vector
+matters — averaging "address proof" with "utility bill" produces a vector that is a weaker match for
+both than either is alone.
+
+**Matching a query to a concept.** The lexicon says *what* to search for; a model decides *when* it
+applies. The first version decided by substring: a query expanded only if it literally contained one
+of a concept's phrases, so "something official with her home address on it" never reached the address
+rule at all, and 2 of the 21 golden document queries expanded. Now each rule's phrasings and its
+concept name are embedded once at startup with the dense model, together with its expansions (54
+short texts, 142 ms). A query is embedded once, inside the expander, and that vector is also what
+the semantic arm scans with; a rule's score is the cosine to its nearest phrasing, and a rule fires
+when that score clears an absolute floor and stays within a ratio of the best rule's:
+
+```
+floor   = max(search.concept-floor, best × search.concept-floor-ratio)
+matched = rules whose nearest phrasing scores ≥ floor          # strongest first; expansions interleaved as before
+```
+
+The absolute floor rejects a query about nothing in the lexicon; the relative one stops a
+single-concept query dragging its embedding-space sibling in ("proof of address" scores the identity
+rule at 0.43) while a query naming two concepts keeps both. The numbers, from `ConceptFloorTest`:
+
+| Measurement | Value |
+| --- | --- |
+| Closest query about nothing in the lexicon ("retirement income planning" → the income rule) | 0.470 |
+| Weakest paraphrase that fires ("someone to run his finances if he becomes unable to") | 0.508 |
+| A phrasing inside a longer sentence, weakest ("I need proof of address for Jane Roe") | 0.533 |
+| Strongest sibling, as a share of an exact phrasing's own score ("address verification" → identity) | 0.64 |
+| Weakest second concept of a two-concept query, as a share of the first | 0.755 |
+
+So `concept-floor` is **0.50** and `concept-floor-ratio` **0.75**, each 0.03 clear of the row that
+binds it. Both are in the dense model's cosine units and move with `embedding.model-id`.
+
+Two things this design does not do, stated rather than tuned around. It does not reach every
+paraphrase: intent is a thinner signal than topic in this embedding space, and "what ID do we need from
+him" (0.47), "what the family receives when she dies" (0.46) and "what can he send to show where he
+lives" (0.39) sit under the floor, listed in the test so the limit stays visible; the lever is a
+phrasing in the lexicon, never a lower floor. And it does not tell a question about a fact from a
+request for its evidence: "what is the client's current address" reaches the address rule at 0.65, on
+purpose — the documents that evidence an address are the documents that state it. One phrasing pulls
+siblings in on one query: "confirm the client is who he says he is" fires identity first and then
+address and income within the ratio; interleaving keeps the identity expansion first, and the
+semantic floors still apply to what the extra probes find. Phrasings that lean on the word "client"
+attract every client query — an earlier phrasing, "acting on behalf of a client", was the strongest
+false match for six unrelated queries and was dropped for that reason; the JSON's comment says so.
 
 Expansion widens the **semantic arm only**. The lexical arm's value is precision on exact tokens,
 and OR-ing extra phrases into it would trade that away for recall the semantic arm already provides;
-the sparse arm was measured with the probes and without, and they changed no rank — only how long
-the page was ([above](#sparse-learned-term-weights)).
+the sparse arm was measured with the probes and without, and on the golden set of the time they
+changed no rank — only how long the page was ([above](#sparse-learned-term-weights)).
 
-It is not free: the probes are embedded together as one padded batch (one transformer forward pass,
-not five), but each probe is still its own vector scan, so an expanded query takes about 50 ms
-against 24 ms for a plain one. That is why the expander caps a query at five probes, and why only
-queries that match a trigger pay anything at all.
+It is not free, but it is cheaper than it was: the expansions' vectors are embedded at startup, so an
+expanded query pays one forward pass for its own vector — as every query does — and the cost is each
+probe's own vector scan: 45 ms against 17 ms for a plain one, from 68 against 30 when the probes were embedded per query. That is why the
+expander caps a query at five probes. More queries now pay it — 8 of the 26 golden document
+queries reach a concept (3 of the original 21, from 2 by substring) — which is the trade a paraphrase-aware matcher
+makes, and the search log names the concept and its score on every request so a fire is a grep away.
 
-The limits are worth stating: a hand-maintained
-lexicon does not generalise, and it is only as good as the person editing it. In a real product this
-knowledge would come from a maintained document taxonomy, or from classifying documents by evidence
-type at ingest. What it should *not* come from is hoping a bigger model has it.
+The limits are worth stating: the normaliser widens how a concept can be asked for, not what the
+lexicon knows, and the lexicon is only as good as the person editing it. Its floors were measured on
+five concepts and some forty queries; a sixth concept near an existing one has to be checked against
+the sibling table before it ships. In a real product the knowledge itself would come from a maintained
+document taxonomy, or from classifying documents by evidence type at ingest. What it should *not* come
+from is hoping a bigger model has it.
 
 ## Fusion
 
@@ -289,13 +338,17 @@ by fusing every combination of the floored arms:
 
 | Arms | hit@5 | MRR |
 | --- | --- | --- |
-| keyword | 13/21 | 0.619 |
-| sparse | 18/21 | 0.807 |
-| semantic | 20/21 | 0.825 |
-| keyword + semantic — the two-arm system | 21/21 | 0.810 |
-| keyword + sparse | 18/21 | 0.807 |
-| **keyword + sparse + semantic** | **21/21** | **0.859** |
-| … with the lexicon's probes through the sparse arm too | 21/21 | 0.859 |
+| keyword | 13/26 | 0.500 |
+| sparse | 21/26 | 0.767 |
+| semantic | 25/26 | 0.833 |
+| keyword + semantic — the two-arm system | 26/26 | 0.821 |
+| keyword + sparse | 21/26 | 0.767 |
+| **keyword + sparse + semantic** | **26/26** | **0.841** |
+| … with the lexicon's probes through the sparse arm too | 26/26 | 0.860 |
+
+(On the 21 queries that predate the paraphrases: two arms 0.810, three arms 0.859, probes through the
+sparse arm 0.859 — the probes column only started to pay once paraphrase queries expanded, and it
+still costs the page length described under [Sparse](#sparse-learned-term-weights).)
 
 No query the two arms hit is lost, and the mean reciprocal rank rises because agreement is now
 three-way: "who can act for a client if they lose capacity" and "inheritance tax on gifts" move from
@@ -319,16 +372,22 @@ between one install and the next. It was caught by running the evaluation twice.
 
 ## Evaluation
 
-`golden-queries.json` holds 28 queries an advisor might type, each with the one result that must come
+`golden-queries.json` holds 33 queries an advisor might type, each with the one result that must come
 back. `SearchQualityTest` asserts every one lands in the top five and prints mean reciprocal rank, so
 a change that keeps every query passing while pushing results down the list is still visible. Three
 document queries were added with the sparse arm, each a partial-term query the lexical AND cannot
 answer ("electricity supplier statement" — `supplier` is absent); on the original eighteen the
-two-arm system scored 0.778 and the three-arm one 0.835.
+two-arm system scored 0.778 and the three-arm one 0.835. Five more came with the semantic normaliser:
+two paraphrases of the address requirement that no phrase in the lexicon appears in — unreachable
+before it — and one paraphrase per other concept that already passed on meaning alone, pinned so a
+concept firing on it never costs the rank. The hard case is stated as measured: for "documents that
+show where the client lives" the normaliser reaches the address rule at 0.81 and the bank statement,
+which carries the address, ranks second; the electricity bill is sixth, behind the documents that
+state an address and two partial sparse matches.
 
 | Set | Queries | hit@5 | MRR |
 | --- | --- | --- | --- |
-| Documents | 21 | 21/21 | 0.859 |
+| Documents | 26 | 26/26 | 0.841 (0.859 on the original 21) |
 | Clients | 7 | 7/7 | 0.929 |
 
 The single client query not at rank 1 is "retired teacher", which ties a retired *teacher* with a
@@ -388,6 +447,14 @@ learned weight a chunk gives the query's terms is one. Measured with `SparseFloo
 So the absolute floor is **0.15**, between the nonsense peak and the weakest real answer, and the
 relative floor is **0.45**, between an incidental overlap and a genuine secondary match. Both move if
 the checkpoint does, which is why `sparse.model-id` is recorded on every chunk row.
+
+**The concept floors are cosines between a query and a lexicon rule's phrasings**, in the dense
+model's units, and were read off the tables in [Matching a query to a
+concept](#why-the-tasks-own-example-needs-more-than-a-model): the closest unrelated query scores
+0.470, the weakest paraphrase that must fire 0.508, so the absolute floor is **0.50**; a two-concept
+query's second concept scores at least 0.755 of its first, an exact phrasing's strongest sibling at
+most 0.64, so the relative floor is **0.75**. `ConceptFloorTest` asserts both from both sides and
+prints the table, including the paraphrases it leaves under the floor.
 
 The principled fix for the absolute floor's overlap is a cross-encoder re-ranker over the fused top
 20, which scores query and document *together* and is calibrated in a way a bi-encoder cosine is not.

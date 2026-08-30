@@ -66,7 +66,7 @@ sparse:
 search:
   default-limit: 10
   max-limit: 50
-  # The five floors below are measured, not picked. How, and on what:
+  # The seven floors below are measured, not picked. How, and on what:
   # docs/search-design.md, "Calibrating the cut-offs".
   #
   # Absolute cosine floor. Answers "can the corpus answer this at all?" — nonsense peaks at 0.21 —
@@ -75,6 +75,16 @@ search:
   # Relative cosine floor, and the one that decides how long a result page is. True positives never
   # score below 0.76 of the query's best hit, so 0.70 keeps them all and drops the long tail.
   semantic-floor-ratio: 0.70
+  # Concept floors for the query expander: the cosine between the query and a lexicon rule's nearest
+  # phrasing, from the very vector the semantic arm scans with, so matching a query to a concept
+  # costs no extra inference. In the dense model's units, so they move with embedding.model-id.
+  # Absolute: queries about nothing in the lexicon reach at most 0.47 ("retirement income planning"
+  # against the income rule); paraphrases of a requirement that must fire start at 0.51. Relative: a
+  # query naming two concepts scores the second at 0.76 of the first or more, so 0.75 keeps both;
+  # what it prunes are weaker also-rans. Both from ConceptFloorTest's table, which also lists the
+  # paraphrases this leaves out and the siblings it lets through.
+  concept-floor: 0.50
+  concept-floor-ratio: 0.75
   # Lexical floor, relative because ts_rank_cd has no absolute scale. Genuine secondary matches
   # score 0.50 to 0.58 of the best hit, incidental ones 0.03 and below; 0.05 sits in that gap.
   keyword-floor-ratio: 0.05

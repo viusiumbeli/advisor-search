@@ -46,6 +46,9 @@ data class SearchProperties(
     @field:Positive val maxLimit: Int,
     @field:DecimalMin("0.0") @field:DecimalMax("1.0") val semanticFloor: Double,
     @field:DecimalMin("0.0") @field:DecimalMax("1.0") val semanticFloorRatio: Double,
+    /** Cosines between a query and a lexicon rule's phrasings, in the dense model's units. */
+    @field:DecimalMin("0.0") @field:DecimalMax("1.0") val conceptFloor: Double,
+    @field:DecimalMin("0.0") @field:DecimalMax("1.0") val conceptFloorRatio: Double,
     @field:DecimalMin("0.0") @field:DecimalMax("1.0") val keywordFloorRatio: Double,
     /** An inner product over the query's own mass, not a cosine, so there is no upper bound to validate against. */
     @field:DecimalMin("0.0") val sparseFloor: Double,

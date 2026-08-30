@@ -8,35 +8,44 @@
     "five ranked the bill 13th or worse for that query while ranking every other probe first.",
     "The association is procedural knowledge about which documents evidence what, so it is supplied",
     "explicitly here rather than hoped for from the model.",
-    "Expansions widen the semantic arm only. The lexical arm exists to match exact tokens, and",
-    "OR-ing extra terms into it would cost precision for recall the semantic arm already provides;",
-    "the sparse arm was measured with the probes and without and they changed no rank, only page",
-    "length. Its own learned expansion does not carry this case either: docs/search-design.md, \"Sparse\"."
+    "A query reaches a rule by meaning, not by containing one of its phrases: each rule's paraphrases and",
+    "its concept name are embedded once at startup with the model the semantic arm searches with, and a",
+    "query fires the rule when its vector comes within search.concept-floor of one of them and within",
+    "search.concept-floor-ratio of the best rule's score — the second number is what stops 'proof of",
+    "address' dragging 'evidence of identity' in. So 'documents that show where the client lives' reaches",
+    "the address rule though none of its words appear here. Paraphrases are examples, not a list to",
+    "complete: state the requirement the way an advisor would, avoid words every client query carries",
+    "('client' on its own pulls unrelated queries towards a rule), add one when a real query shows up in",
+    "the search log with concepts=[] and should not have, then run ConceptFloorTest and read its table —",
+    "a phrasing close to another rule's wording narrows the margin between them.",
+    "Expansions widen the semantic arm only. The lexical arm exists to match exact tokens, and OR-ing",
+    "extra terms into it would cost precision for recall the semantic arm already provides; the sparse arm",
+    "was measured with the probes and without and they changed no rank, only page length."
   ],
   "rules": [
     {
       "concept": "evidence of address",
-      "triggers": ["address proof", "proof of address", "address verification", "evidence of address", "residency proof"],
+      "paraphrases": ["address proof", "proof of address", "address verification", "evidence of address", "residency proof", "something that shows where the client lives", "something that confirms the client's home address"],
       "expansions": ["utility bill", "council tax bill", "bank statement", "tenancy agreement"]
     },
     {
       "concept": "evidence of identity",
-      "triggers": ["proof of identity", "identity proof", "id document", "identity verification", "identity documents"],
+      "paraphrases": ["proof of identity", "identity proof", "id document", "identity verification", "identity documents", "a way to prove who someone is", "how a person proves their identity", "confirming that a person is who they say they are"],
       "expansions": ["passport", "driving licence", "photographic identification", "certified copy of identity document"]
     },
     {
       "concept": "evidence of income",
-      "triggers": ["proof of income", "income proof", "evidence of earnings", "proof of earnings"],
+      "paraphrases": ["proof of income", "income proof", "evidence of earnings", "proof of earnings", "proof of what the client earns", "evidence of the client's earnings"],
       "expansions": ["payslip", "P60 end of year certificate", "tax return", "employment contract salary"]
     },
     {
       "concept": "acting for someone who has lost capacity",
-      "triggers": ["power of attorney", "lost capacity", "loss of capacity", "acting on behalf of a client", "mental capacity"],
+      "paraphrases": ["power of attorney", "lost capacity", "loss of capacity", "mental capacity", "who can act for someone who can no longer manage their own affairs", "someone appointed to make decisions for a person who has lost capacity"],
       "expansions": ["lasting power of attorney attorney appointed", "donor best interests decisions", "deputy appointed by the court"]
     },
     {
       "concept": "life cover paid on death",
-      "triggers": ["death benefit", "life cover", "life assurance payout", "who inherits the policy"],
+      "paraphrases": ["death benefit", "life cover", "life assurance payout", "sum assured on death", "what the life policy pays out on death"],
       "expansions": ["sum assured payable on death", "policy written in trust beneficiaries", "whole of life policy schedule"]
     }
   ]

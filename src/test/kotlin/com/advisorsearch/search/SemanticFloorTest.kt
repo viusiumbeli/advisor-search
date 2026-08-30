@@ -59,6 +59,7 @@ class SemanticFloorTest(
     fun `the floor never silences a document that genuinely answers the query`() {
         val tooLow = mutableListOf<String>()
         var worst = 1.0
+        var worstRatio = 1.0
 
         answerable.forEach { (query, expected) ->
             val score = bestScoreFor(query, expected)
@@ -70,6 +71,15 @@ class SemanticFloorTest(
             }
             val ranked = semantic(query)
             val best = ranked.firstOrNull()?.score ?: 0.0
+            // The relative floor is taken against the best hit across every probe, and an expansion
+            // raises that ceiling as well as the answer: a probe that lifts some other document can
+            // cut the real one. So the ratio is asserted, not just printed.
+            if (best > 0) worstRatio = minOf(worstRatio, score / best)
+            if (score < best * properties.semanticFloorRatio) {
+                tooLow +=
+                    "  \"$query\" -> \"$expected\" scored %.4f, under %.2f of the best hit %.4f"
+                        .format(score, properties.semanticFloorRatio, best)
+            }
             println(
                 "%-48s expected %.4f  best %.4f  ratio %.2f  above-0.30 %d".format(
                     "\"$query\"",
@@ -81,7 +91,10 @@ class SemanticFloorTest(
             )
         }
 
-        println("worst true positive: %.4f against a floor of %.2f".format(worst, properties.semanticFloor))
+        println(
+            "worst true positive: %.4f against a floor of %.2f; worst share of the best hit: %.2f against %.2f"
+                .format(worst, properties.semanticFloor, worstRatio, properties.semanticFloorRatio),
+        )
         assertTrue(tooLow.isEmpty(), "the floor is cutting real answers:\n" + tooLow.joinToString("\n"))
     }
 
@@ -114,10 +127,11 @@ class SemanticFloorTest(
 
     private fun topScore(query: String): Double = semantic(query).firstOrNull()?.score ?: 0.0
 
-    /** Same probes and the same shared reduction production uses, but with no candidate cap. */
+    /** Same probe vectors and the same shared reduction production uses, but with no candidate cap. */
     private fun semantic(query: String): List<DocumentMatch> =
-        embeddings
-            .embedQueries(expander.expand(query))
+        expander
+            .expand(query)
+            .vectors
             .flatMap { vector -> documents.semanticSearch(vector, CANDIDATES) }
             .bestByDocument()
 

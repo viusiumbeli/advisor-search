@@ -53,8 +53,10 @@ class StartupChecks(
     /**
      * First inference allocates the ONNX arenas and pages in the native libraries. Paying that here
      * means no user request does, and a model that cannot run fails startup rather than a search.
-     * The sparse model is warmed with a document pass: its query side is a table lookup, and only a
-     * document pass allocates the vocabulary-wide arena the MLM head needs.
+     * The dense model has in fact already run once, embedding the lexicon while the expander was
+     * built; this pass proves it answers. The sparse model is warmed with a document pass: its query
+     * side is a table lookup, and only a document pass allocates the vocabulary-wide arena the MLM
+     * head needs.
      */
     private fun warmUp() {
         val (vector, elapsed) = measureTimedValue { embeddings.embedQuery("warm up the embedding model") }
