@@ -1,0 +1,8 @@
+HM Revenue and Customs — Self Assessment tax return (SA100) for the year 6 April 2025 to 5 April 2026
+Unique Taxpayer Reference 4471 20817 3    Filed online 14 January 2027
+
+Taxpayer: Tobias Fenwick, 8 Sedgwick Lane, Harrogate HG1 4QP
+Income: employment (Northgate Analytics Ltd) 57,500    self-employment profits from consultancy (SA103) 18,240    UK interest 612    dividends 1,950
+Total income received 78,302    less personal allowance 12,570    total income on which tax is due 65,732
+Income tax due 15,614.20    less tax already deducted at source 8,476.80    balance payable by 31 January 2027 7,137.40
+Tax calculation summary (SA302) enclosed; payments on account for 2026 to 2027 set at 3,568.70 each.

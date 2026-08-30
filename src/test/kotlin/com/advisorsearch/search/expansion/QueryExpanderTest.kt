@@ -36,9 +36,12 @@ class QueryExpanderTest(
 
     /**
      * Queries outside the golden set whose page is worth seeing every run: a phrasing of the removed
-     * rule, the one income phrasing fusion keeps out of the top five, and the new rule's own name.
+     * rule, the one income phrasing fusion keeps out of the top five, and the source-of-funds rule,
+     * which has no seeded document to earn a golden with — the seed holds no completion statement, will
+     * or grant of probate — so its page is printed here and its probes are proved in EvidenceFixtureTest.
      */
-    private val reportedQueries = listOf("death benefit", "proof of income", "source of funds")
+    private val reportedQueries =
+        listOf("death benefit", "proof of income", "source of funds", "evidence of where the invested money came from")
 
     @Test
     fun `a query about nothing in the lexicon is one probe and no concept`() {

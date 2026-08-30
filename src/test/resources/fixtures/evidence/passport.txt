@@ -1,0 +1,8 @@
+PASSPORT    PASSEPORT    United Kingdom of Great Britain and Northern Ireland
+Type P    Code GBR    Passport No. 561204893
+Surname FENWICK    Given names TOBIAS JAMES    Nationality BRITISH CITIZEN
+Date of birth 12 MAR 1988    Sex M    Place of birth LEEDS
+Date of issue 05 JUN 2021    Date of expiry 05 JUN 2031    Authority HMPO
+Holder's signature    T J Fenwick
+P<GBRFENWICK<<TOBIAS<JAMES<<<<<<<<<<<<<<<<<<<<<<
+5612048935GBR8803126M3106053<<<<<<<<<<<<<<04

@@ -1,0 +1,8 @@
+Northgate Analytics Ltd
+Payslip for the period 1 March 2026 to 31 March 2026, paid 27 March 2026
+
+Employee: Tobias Fenwick    Employee number: 0417    Tax code: 1257L    NI number: QQ 12 34 56 C
+Payments: Basic salary 4,791.67    Total gross pay 4,791.67
+Deductions: PAYE income tax 706.40    Employee National Insurance 297.05    Pension contribution (5%) 239.58
+Net pay: 3,548.64 paid by BACS to the account ending 4471
+Year to date: gross pay 57,500.04    tax paid 8,476.80    National Insurance 3,564.60    pension 2,875.00

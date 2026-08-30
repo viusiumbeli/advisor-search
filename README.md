@@ -192,7 +192,7 @@ against "address proof", where it ranks 13th — all five sentence-embedding mod
 it 13th to 18th, and the learned sparse model 4th, while ranking every other probe first. "An
 electricity bill can evidence
 where you live" is procedural knowledge about a domain, not a distributional fact about English, so
-it is stated explicitly in `src/main/resources/search/query-expansions.json`: five concepts, each
+it is stated explicitly in `src/main/resources/search/query-expansions.json`: eleven concepts, each
 with the ways an advisor phrases the requirement and the phrases to also search for. The lexicon
 says *what* to search for; a model decides *when* it applies. Each concept's phrasings are embedded
 once at startup, and a query fires a concept when the vector the semantic arm already computed for
@@ -220,7 +220,7 @@ numbers per combination, which is how the third arm earned its place.
 
 | | |
 | --- | --- |
-| Retrieval quality | documents 35/35 hit@5 (MRR 0.802; 0.847 on the 26 before the lexicon review and 0.859 on the 21 that predate the paraphrase queries, where the two-arm fusion scores 0.810), clients 7/7 (MRR 0.929) |
+| Retrieval quality | documents 34/34 hit@5 (MRR 0.809; 0.837 on the 26 before the lexicon review and 0.859 on the 21 that predate the paraphrase queries, where the two-arm fusion scores 0.810), clients 7/7 (MRR 0.929) |
 | `GET /search`, warm | 17 ms median, 45 ms when a query expands to five probes (68 before the expansions' vectors were precomputed) — the query's one forward pass and the lexicon match are about 3 ms of either, the sparse arm 1–3 ms; the rest is the semantic arm's scans, one per probe |
 | Under concurrency | p95 150 ms at 20 concurrent clients, 115 req/s |
 | Ingest | 0.93 s for a 10 KB document, 6.5 s at the 100,000-character cap — two models per chunk, and past the point at which the design says ingest should go asynchronous |

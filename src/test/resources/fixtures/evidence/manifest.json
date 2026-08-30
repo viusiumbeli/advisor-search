@@ -1,0 +1,233 @@
+{
+  "_comment": [
+    "Held-out evidence documents for EvidenceFixtureTest: one short synthetic document per document type the",
+    "expansion lexicon names and the seeded demo corpus lacks. They are never seeded into the demo; the test",
+    "ingests them through the real path inside a transaction that rolls back. Each is written the way the",
+    "real document reads (a payslip's fields, a court order's operative words), not toward the probe that",
+    "must find it. `seeded` maps the types the demo corpus already holds to a title substring of that document."
+  ],
+  "fixtures": [
+    {
+      "expansion": "payslip",
+      "title": "Payslip, Northgate Analytics Ltd, March 2026",
+      "file": "payslip.txt"
+    },
+    {
+      "expansion": "P60 end of year certificate",
+      "title": "P60 End of Year Certificate, tax year to 5 April 2026",
+      "file": "p60.txt"
+    },
+    {
+      "expansion": "tax return",
+      "title": "Self Assessment tax return SA100, tax year 2025 to 2026",
+      "file": "tax-return.txt"
+    },
+    {
+      "expansion": "employment contract",
+      "title": "Contract of Employment, Northgate Analytics Ltd",
+      "file": "employment-contract.txt"
+    },
+    {
+      "expansion": "council tax bill",
+      "title": "Council Tax Bill 2026 to 2027, North Yorkshire Council",
+      "file": "council-tax-bill.txt"
+    },
+    {
+      "expansion": "mortgage statement",
+      "title": "Annual Mortgage Statement, 1 January to 31 December 2025",
+      "file": "mortgage-statement.txt"
+    },
+    {
+      "expansion": "tenancy agreement",
+      "title": "Assured Shorthold Tenancy Agreement, Flat 3, 41 Wharf Street",
+      "file": "tenancy-agreement.txt"
+    },
+    {
+      "expansion": "benefit award letter",
+      "title": "State Pension award letter, Department for Work and Pensions",
+      "file": "benefit-letter.txt"
+    },
+    {
+      "expansion": "HMRC correspondence",
+      "title": "HMRC PAYE Coding Notice (P2), tax year 2026 to 2027",
+      "file": "hmrc-letter.txt"
+    },
+    {
+      "expansion": "passport",
+      "title": "British passport, personal details page",
+      "file": "passport.txt"
+    },
+    {
+      "expansion": "driving licence",
+      "title": "UK photocard driving licence (DVLA)",
+      "file": "driving-licence.txt"
+    },
+    {
+      "expansion": "national identity card",
+      "title": "National identity card, Republic of Poland",
+      "file": "national-identity-card.txt"
+    },
+    {
+      "expansion": "certified copy of identity document",
+      "title": "Solicitor's certification of a copy passport",
+      "file": "certified-copy.txt"
+    },
+    {
+      "expansion": "firearms certificate",
+      "title": "Firearm certificate, North Yorkshire Police",
+      "file": "firearms-certificate.txt"
+    },
+    {
+      "expansion": "enduring power of attorney",
+      "title": "Enduring Power of Attorney, registered with the Office of the Public Guardian",
+      "file": "enduring-power-of-attorney.txt"
+    },
+    {
+      "expansion": "court order appointing a deputy",
+      "title": "Court of Protection order appointing a property and affairs deputy",
+      "file": "deputyship-order.txt"
+    },
+    {
+      "expansion": "completion statement from a property sale",
+      "title": "Completion statement, sale of 22 Orchard Close",
+      "file": "completion-statement.txt"
+    },
+    {
+      "expansion": "copy of the will",
+      "title": "Last Will and Testament of Margaret Ellen Fenwick",
+      "file": "will.txt"
+    },
+    {
+      "expansion": "grant of probate",
+      "title": "Grant of Probate, estate of Margaret Ellen Fenwick",
+      "file": "grant-of-probate.txt"
+    },
+    {
+      "expansion": "divorce settlement consent order",
+      "title": "Financial remedy consent order, Family Court at Leeds",
+      "file": "consent-order.txt"
+    },
+    {
+      "expansion": "Land Registry title register",
+      "title": "Official copy of register of title, title number NYK 448211",
+      "file": "title-register.txt"
+    },
+    {
+      "expansion": "register of people with significant control",
+      "title": "Register of people with significant control, Fenwick Advisory Partners Ltd",
+      "file": "psc-register.txt"
+    },
+    {
+      "expansion": "shareholder register",
+      "title": "Register of members, Fenwick Advisory Partners Ltd",
+      "file": "register-of-members.txt"
+    },
+    {
+      "expansion": "Companies House confirmation statement",
+      "title": "Companies House confirmation statement CS01, Fenwick Advisory Partners Ltd",
+      "file": "confirmation-statement.txt"
+    },
+    {
+      "expansion": "investment portfolio valuation",
+      "title": "Investment portfolio valuation, Meridian Vale Investments, 31 March 2026",
+      "file": "portfolio-valuation.txt"
+    },
+    {
+      "expansion": "ISA statement",
+      "title": "Stocks and Shares ISA annual statement, tax year 2025 to 2026",
+      "file": "isa-statement.txt"
+    },
+    {
+      "expansion": "savings account statement",
+      "title": "Savings account statement, Ribble Rock Building Society",
+      "file": "savings-statement.txt"
+    },
+    {
+      "expansion": "share certificate",
+      "title": "Share certificate, Kestrel Global Infrastructure plc",
+      "file": "share-certificate.txt"
+    },
+    {
+      "expansion": "property valuation report",
+      "title": "Property valuation report, 8 Sedgwick Lane, Harrogate",
+      "file": "property-valuation.txt"
+    },
+    {
+      "expansion": "loan agreement",
+      "title": "Personal loan agreement, Calder Bank plc",
+      "file": "loan-agreement.txt"
+    },
+    {
+      "expansion": "credit card statement",
+      "title": "Credit card statement, Calder Bank Platinum Mastercard, March 2026",
+      "file": "credit-card-statement.txt"
+    },
+    {
+      "expansion": "credit report",
+      "title": "Statutory credit report, Experian, 2 March 2026",
+      "file": "credit-report.txt"
+    },
+    {
+      "expansion": "hire purchase agreement",
+      "title": "Hire purchase agreement, Dales Motor Finance",
+      "file": "hire-purchase-agreement.txt"
+    },
+    {
+      "expansion": "endowment policy statement",
+      "title": "Endowment policy annual statement, Pennine Life, policy EN 0932 4471",
+      "file": "endowment-statement.txt"
+    },
+    {
+      "expansion": "birth certificate",
+      "title": "Birth certificate, Isla Grace Fenwick",
+      "file": "birth-certificate.txt"
+    },
+    {
+      "expansion": "Child Benefit award letter",
+      "title": "Child Benefit award notice, HM Revenue and Customs",
+      "file": "child-benefit-letter.txt"
+    },
+    {
+      "expansion": "title deeds",
+      "title": "Conveyance of 5 Mill Race, York, 14 June 1962 (title deeds, unregistered land)",
+      "file": "title-deeds.txt"
+    },
+    {
+      "expansion": "title plan",
+      "title": "Title plan, title number NYK 448211",
+      "file": "title-plan.txt"
+    },
+    {
+      "expansion": "buildings insurance schedule",
+      "title": "Buildings insurance policy schedule, Ribble Rock Home Insurance, 2026 to 2027",
+      "file": "buildings-insurance-schedule.txt"
+    },
+    {
+      "expansion": "ground rent and service charge demand",
+      "title": "Service charge and ground rent demand, Wharf Street Management Company, 2026",
+      "file": "service-charge-demand.txt"
+    },
+    {
+      "expansion": "child maintenance arrangement",
+      "title": "Child maintenance calculation, Child Maintenance Service",
+      "file": "child-maintenance-arrangement.txt"
+    },
+    {
+      "expansion": "general power of attorney",
+      "title": "General power of attorney, Powers of Attorney Act 1971",
+      "file": "general-power-of-attorney.txt"
+    },
+    {
+      "expansion": "audited accounts",
+      "title": "Audited financial statements, Fenwick Advisory Partners Ltd, year ended 31 March 2026",
+      "file": "audited-accounts.txt"
+    }
+  ],
+  "seeded": {
+    "utility bill": "Electricity Account Statement",
+    "bank statement": "Bank Statement",
+    "pension statement": "Annual Benefit Statement",
+    "lasting power of attorney": "Lasting Power of Attorney",
+    "trust deed": "Trust Deed Summary"
+  }
+}

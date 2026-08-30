@@ -16,11 +16,13 @@ import kotlin.test.assertTrue
  * within the ratio of the best rule's score; the tables below are what those two numbers were read
  * from. Full numbers in docs/search-design.md, "Matching a query to a concept".
  *
- * Two kinds of row are documented rather than asserted away. Paraphrases measured under the floor
- * are listed with their score: intent is a thinner signal than topic in this embedding space, and a
- * question that shares few words with any phrasing does not reach it. Sibling concepts that ride in
- * within the ratio on one query are listed too; interleaving keeps the intended concept's expansion
- * first, and the semantic floors still apply to whatever the extra probes find.
+ * Several kinds of row are documented rather than asserted away, each asserted to stay as listed so
+ * the record cannot drift: paraphrases measured under the floor (intent is a thinner signal than topic
+ * in this embedding space); sibling concepts that ride in within the ratio on one query, and the whole
+ * financial-situation cluster, whose members ride each other by nature; a paraphrase another rule
+ * outranks; and a two-concept query whose second concept sits under the ratio. Interleaving keeps the
+ * intended concept's expansion first, and the semantic floors still apply to whatever the extra probes
+ * find. The sibling matrix printed at the end is where the cluster's numbers are read from.
  */
 class ConceptFloorTest(
     private val expander: QueryExpander,
@@ -56,19 +58,33 @@ class ConceptFloorTest(
                     "income verification for the mortgage application",
                     "evidence of the income declared",
                 ),
-            "acting for someone who has lost capacity" to
+            "authority to act for another person" to
                 listOf(
                     "who makes decisions if he can no longer manage his affairs",
                     "someone to run his finances if he becomes unable to",
                     "who can act for a client if they lose capacity",
                     "can the attorneys act while he still has capacity",
                     "is the LPA registered with the Office of the Public Guardian",
+                    "who is allowed to give instructions on his behalf",
+                    "can the executor deal with the account",
                 ),
             "source of funds and source of wealth" to
                 listOf(
                     "where did the money she is investing come from",
                     "how did he build up his wealth",
                     "evidence of where the invested money came from",
+                ),
+            "beneficial ownership of a company or trust" to
+                listOf("who ultimately owns the business", "the ownership structure behind the company"),
+            "evidence of property ownership" to listOf("does he own his home", "evidence that the property is in her name"),
+            "evidence of assets" to listOf("what savings and investments does he hold", "statement of her savings and investments"),
+            "evidence of liabilities" to listOf("which debts are outstanding", "evidence of outstanding borrowing"),
+            "evidence of expenditure" to listOf("what are her monthly outgoings", "evidence of committed spending"),
+            "repayment strategy for an interest-only mortgage" to
+                listOf(
+                    "how will the mortgage be repaid at the end of the term",
+                    "evidence of the repayment vehicle",
+                    "repayment strategy for the interest-only mortgage",
                 ),
         )
 
@@ -80,18 +96,52 @@ class ConceptFloorTest(
             "is the LPA registered with the Office of the Public Guardian",
         )
 
+    /**
+     * Paraphrases another rule outranks — the intended concept still fires, second. Listed like the
+     * paraphrases under the floor: the near-synonym cluster (income, assets, liabilities, expenditure)
+     * is the design's known limit, measured in the sibling matrix below and written up in
+     * docs/search-design.md; the lever is a phrasing or a hierarchy of rules, never a lower ratio.
+     */
+    private val outrankedBy = mapOf("someone to run his finances if he becomes unable to" to "evidence of expenditure")
+
+    /**
+     * The financial-situation cluster: COBS 9A.2.7R's "regular income", "assets", "regular financial
+     * commitments", with the two rules whose evidence is the same documents (a mortgage repayment
+     * vehicle is an asset; a property is one). Their exact phrasings sit at 0.70–0.73 of each other
+     * (the matrix below) and their natural paraphrases ride each other in within the ratio, so a rider
+     * inside the cluster is allowed and printed rather than listed one row at a time. That is the
+     * design's known limit; the resolution proposed in docs/search-design.md is a hierarchy, not a lower ratio.
+     */
+    private val crowdedCluster =
+        setOf(
+            "evidence of income",
+            "evidence of assets",
+            "evidence of liabilities",
+            "evidence of expenditure",
+            "repayment strategy for an interest-only mortgage",
+            "evidence of property ownership",
+        )
+
     /** Sibling concepts measured within the ratio on a single-concept query, allowed and listed. */
     private val siblingsAllowed =
         mapOf(
             "confirm the client is who he says he is" to setOf("evidence of address", "evidence of income"),
-            "evidence of where the invested money came from" to setOf("evidence of income"),
+            "evidence of where the invested money came from" to
+                setOf(
+                    "evidence of income",
+                    "evidence of assets",
+                    "evidence of expenditure",
+                ),
+            "where did the money she is investing come from" to setOf("evidence of assets"),
+            "residential address evidence for customer due diligence" to setOf("evidence of property ownership"),
+            "the ownership structure behind the company" to setOf("evidence of property ownership"),
         )
 
     /** A phrasing inside a longer sentence — what substring matching used to handle. */
     private val sentences =
         mapOf(
             "I need proof of address for Jane Roe" to "evidence of address",
-            "please find the power of attorney for Mr Ashworth-Bell" to "acting for someone who has lost capacity",
+            "please find the power of attorney for Mr Ashworth-Bell" to "authority to act for another person",
             "does the file hold a proof of identity for the joint applicant" to "evidence of identity",
             "we still need proof of income for the Lindqvist remortgage" to "evidence of income",
             "please confirm the source of funds for Mrs Moreau's GIA" to "source of funds and source of wealth",
@@ -112,7 +162,7 @@ class ConceptFloorTest(
      * it). Listed, like the paraphrases under the floor; the lever is a phrasing, never a lower ratio.
      */
     private val secondUnderTheRatio =
-        mapOf("power of attorney and proof of identity for the attorneys" to "acting for someone who has lost capacity")
+        mapOf("power of attorney and proof of identity for the attorneys" to "authority to act for another person")
 
     /**
      * Questions about a concept's own topic that ask for a value rather than for evidence. Reported,
@@ -130,6 +180,7 @@ class ConceptFloorTest(
             "what is his annual salary",
             "how much does she earn",
             "who is the attorney named on the LPA",
+            "proceeds of the Bath property sale",
         )
 
     /**
@@ -176,8 +227,6 @@ class ConceptFloorTest(
             "tax agreement between two countries",
             "inconsistent answers on the risk questionnaire",
             "which countries is he tax resident in",
-            "repayment strategy for the interest-only mortgage",
-            "proceeds of the Bath property sale",
             "payout when the policyholder dies",
             "what the family receives when she dies",
             "sum paid out on death",
@@ -208,8 +257,16 @@ class ConceptFloorTest(
                     if (fired.isNotEmpty()) failures += "  \"$query\" is listed under the floor but fired $fired"
                 } else {
                     weakestFiring = minOf(weakestFiring, scored.first().similarity)
-                    if (fired.firstOrNull() != concept) failures += "  \"$query\" -> expected \"$concept\" first, fired $fired"
-                    val extras = fired.drop(1).toSet() - siblingsAllowed.getOrDefault(query, emptySet())
+                    val expectedFirst = outrankedBy[query] ?: concept
+                    if (fired.firstOrNull() != expectedFirst) failures += "  \"$query\" -> expected \"$expectedFirst\" first, fired $fired"
+                    if (query in outrankedBy &&
+                        concept !in fired
+                    ) {
+                        failures += "  \"$query\" is listed as outranked but no longer fires \"$concept\" at all"
+                    }
+                    val allowed =
+                        siblingsAllowed.getOrDefault(query, emptySet()) + if (concept in crowdedCluster) crowdedCluster else emptySet()
+                    val extras = fired.toSet() - concept - expectedFirst - allowed
                     if (extras.isNotEmpty()) failures += "  \"$query\" dragged in $extras"
                 }
             }
@@ -307,11 +364,45 @@ class ConceptFloorTest(
         contentQuestions.forEach { query -> print(query, expander.similarities(query), expander.expand(query).concepts.map { it.concept }) }
     }
 
+    /**
+     * The sibling matrix: for every pair of rules, the highest score any exact phrasing of the row's
+     * rule reaches against the column's rule, as a share of its own score (1.00 for an exact phrasing).
+     * A cell at or above the ratio (0.75) means a phrasing of the row fires the column too; cells just
+     * under it are the margins a new rule or phrasing has to respect. Reported every run because the
+     * limit this design has — near-synonym requirements crowd — is read from here.
+     */
+    @Test
+    fun `the sibling matrix between every pair of rules, reported`() {
+        val concepts = lexicon.rules.map { it.concept }
+        val labels = concepts.map { it.take(LABEL) }
+        println("%-${LABEL}s ${labels.joinToString(" ") { "%-${LABEL}s".format(it) }}".format("row fires column at"))
+        lexicon.rules.forEach { rule ->
+            val shares =
+                (listOf(rule.concept) + rule.paraphrases)
+                    .map { phrasing -> expander.similarities(phrasing) }
+                    .fold(concepts.associateWith { 0.0 }) { best, scored ->
+                        val own = scored.first { it.concept == rule.concept }.similarity
+                        best.mapValues { (concept, share) -> maxOf(share, scored.first { it.concept == concept }.similarity / own) }
+                    }
+            println(
+                "%-${LABEL}s ${concepts.joinToString(
+                    " ",
+                ) { concept -> "%-${LABEL}s".format(if (concept == rule.concept) "-" else "%.2f".format(shares.getValue(concept))) }}"
+                    .format(rule.concept.take(LABEL)),
+            )
+        }
+    }
+
     @Test
     fun `the regulation's own vocabulary is reported, not policed`() {
         regulatoryVocabulary.forEach { query ->
             print(query, expander.similarities(query), expander.expand(query).concepts.map { it.concept })
         }
+    }
+
+    private companion object {
+        /** Column width of the sibling matrix. */
+        const val LABEL = 14
     }
 
     private fun print(
