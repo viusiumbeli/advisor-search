@@ -2,12 +2,14 @@ package com.advisorsearch.search
 
 import com.advisorsearch.SeededIntegrationTest
 import com.advisorsearch.config.SearchProperties
+import com.advisorsearch.search.ranking.FusedDocument
 import com.advisorsearch.search.ranking.RankedList
 import com.advisorsearch.search.ranking.ReciprocalRankFusion
 import org.junit.jupiter.api.Test
 import org.springframework.core.io.ClassPathResource
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.module.kotlin.readValue
+import java.util.UUID
 import kotlin.test.assertTrue
 
 /**
@@ -55,10 +57,11 @@ class SearchArmAblationTest(
             val perConfiguration =
                 configurations.associateWith { configuration ->
                     val fused =
-                        ReciprocalRankFusion.fuse(
-                            configuration.split('+').map { name -> RankedList(name, lists.getValue(name).map { it.reference.id }) },
-                            properties.rrfK,
-                        )
+                        ReciprocalRankFusion
+                            .fuse(
+                                configuration.split('+').map { name -> RankedList(name, lists.getValue(name).map { it.reference.id }) },
+                                properties.rrfK,
+                            ).sortedWith(productionOrder(titles))
                     fused.indexOfFirst { titles.getValue(it.id).contains(case.expect, ignoreCase = true) } + 1
                 }
             perConfiguration.forEach { (configuration, rank) -> ranks.getValue(configuration) += rank }
@@ -97,7 +100,23 @@ class SearchArmAblationTest(
         assertTrue(regressions.isEmpty(), "the sparse arm lost queries:\n" + regressions.joinToString("\n"))
     }
 
+    /**
+     * `fuse` orders exact ties by id and leaves the real tie-break to its caller. SearchService breaks
+     * them by agreement, then by the most literal arm, then by title; without the same keys here a
+     * semantic-only hit that ties a sparse-only one lands a place above where the product puts it, and
+     * the table stops describing the system it is quoted for.
+     */
+    private fun productionOrder(titles: Map<UUID, String>): Comparator<FusedDocument> =
+        compareByDescending<FusedDocument> { it.score }
+            .thenByDescending { it.sources.size }
+            .thenBy { document -> document.sources.minOf { EVIDENCE_ORDER.indexOf(it.removeSuffix("(probes)")) } }
+            .thenBy { titles.getValue(it.id) }
+            .thenBy { it.id }
+
     private companion object {
         const val HIT_AT = 5
+
+        /** Most to least literal, as SearchService orders sources. */
+        val EVIDENCE_ORDER = listOf("keyword", "sparse", "semantic")
     }
 }

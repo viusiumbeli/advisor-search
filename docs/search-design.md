@@ -254,7 +254,8 @@ budget and changed nothing.
 
 So the knowledge is stated explicitly, in `src/main/resources/search/query-expansions.json`: five
 concepts, each with the ways an advisor phrases the requirement (its *paraphrases*) and the phrases
-to also search for. A query that reaches a concept is run as several probes and each document keeps
+to also search for — where each comes from, and what each probe reaches, is in [Where the lexicon
+comes from](#where-the-lexicon-comes-from) below. A query that reaches a concept is run as several probes and each document keeps
 its best score across them. Taking the maximum rather than blending the probes into one vector
 matters — averaging "address proof" with "utility bill" produces a vector that is a weaker match for
 both than either is alone.
@@ -263,8 +264,8 @@ both than either is alone.
 applies. The first version decided by substring: a query expanded only if it literally contained one
 of a concept's phrases, so "something official with her home address on it" never reached the address
 rule at all, and 2 of the 21 golden document queries expanded. Now each rule's phrasings and its
-concept name are embedded once at startup with the dense model, together with its expansions (54
-short texts, 142 ms). A query is embedded once, inside the expander, and that vector is also what
+concept name are embedded once at startup with the dense model, together with its expansions (49
+short texts, 101 ms in the container). A query is embedded once, inside the expander, and that vector is also what
 the semantic arm scans with; a rule's score is the cosine to its nearest phrasing, and a rule fires
 when that score clears an absolute floor and stays within a ratio of the best rule's:
 
@@ -284,22 +285,30 @@ rule at 0.43) while a query naming two concepts keeps both. The numbers, from `C
 | A phrasing inside a longer sentence, weakest ("I need proof of address for Jane Roe") | 0.533 |
 | Strongest sibling, as a share of an exact phrasing's own score ("address verification" → identity) | 0.64 |
 | Weakest second concept of a two-concept query, as a share of the first | 0.755 |
+| A two-concept query whose second concept measures under the ratio and is listed ("power of attorney and proof of identity for the attorneys" → identity) | 0.74 |
 
 So `concept-floor` is **0.50** and `concept-floor-ratio` **0.75**, each 0.03 clear of the row that
 binds it. Both are in the dense model's cosine units and move with `embedding.model-id`.
 
 Two things this design does not do, stated rather than tuned around. It does not reach every
 paraphrase: intent is a thinner signal than topic in this embedding space, and "what ID do we need from
-him" (0.47), "what the family receives when she dies" (0.46) and "what can he send to show where he
-lives" (0.39) sit under the floor, listed in the test so the limit stays visible; the lever is a
-phrasing in the lexicon, never a lower floor. And it does not tell a question about a fact from a
-request for its evidence: "what is the client's current address" reaches the address rule at 0.65, on
-purpose — the documents that evidence an address are the documents that state it. One phrasing pulls
-siblings in on one query: "confirm the client is who he says he is" fires identity first and then
-address and income within the ratio; interleaving keeps the identity expansion first, and the
-semantic floors still apply to what the extra probes find. Phrasings that lean on the word "client"
-attract every client query — an earlier phrasing, "acting on behalf of a client", was the strongest
-false match for six unrelated queries and was dropped for that reason; the JSON's comment says so.
+him" (0.47), "what can he send to show where he lives" (0.44) and "is the LPA registered with the
+Office of the Public Guardian" (0.35 — an acronym no phrasing carries) sit under the floor, listed in
+the test so the limit stays visible; the lever is a phrasing in the lexicon, never a lower floor — and
+not every phrasing is a lever: "photo ID" was tried for the first of those, left it at 0.47, and became
+the nearest phrasing for reference codes and nonsense queries, so it went. And it does not tell a
+question about a fact from a request for its evidence: "what is the client's current address" reaches
+the address rule at 0.65, on purpose — the documents that evidence an address are the documents that
+state it. Two queries pull a sibling in within the ratio: "confirm the client is who he says he is"
+fires identity first and then address and income; "evidence of where the invested money came from"
+fires source of funds first and then income at 0.76 of it — a salary credit is a source of funds, so
+both rides are allowed and listed; interleaving keeps the intended concept's expansion first, and the
+semantic floors still apply to what the extra probes find. One two-concept query goes the other way:
+"power of attorney and proof of identity for the attorneys" scores the capacity rule at 0.81 and
+identity at 0.74 of that, so identity stays silent — listed, not tuned. Phrasings that lean on the word
+"client" attract every client query — an earlier phrasing, "acting on behalf of a client", was the
+strongest false match for six unrelated queries and was dropped for that reason; the JSON's comment
+says so.
 
 Expansion widens the **semantic arm only**. The lexical arm's value is precision on exact tokens,
 and OR-ing extra phrases into it would trade that away for recall the semantic arm already provides;
@@ -308,17 +317,144 @@ changed no rank — only how long the page was ([above](#sparse-learned-term-wei
 
 It is not free, but it is cheaper than it was: the expansions' vectors are embedded at startup, so an
 expanded query pays one forward pass for its own vector — as every query does — and the cost is each
-probe's own vector scan: 45 ms against 17 ms for a plain one, from 68 against 30 when the probes were embedded per query. That is why the
-expander caps a query at five probes. More queries now pay it — 8 of the 26 golden document
-queries reach a concept (3 of the original 21, from 2 by substring) — which is the trade a paraphrase-aware matcher
-makes, and the search log names the concept and its score on every request so a fire is a grep away.
+probe's own vector scan: 45 ms against 20 ms for a plain one, from 68 against 30 when the probes were
+embedded per query, and 30–33 ms for the three-probe rules (income, capacity, source of funds). That
+is why the expander caps a query at five probes and why the lexicon's order is a budget. More queries
+now pay it — 13 of the 35 golden document queries reach a concept (3 of the original 21, from 2 by
+substring) — which is the trade a paraphrase-aware matcher makes, and the search log names the concept
+and its score on every request so a fire is a grep away.
 
 The limits are worth stating: the normaliser widens how a concept can be asked for, not what the
 lexicon knows, and the lexicon is only as good as the person editing it. Its floors were measured on
-five concepts and some forty queries; a sixth concept near an existing one has to be checked against
-the sibling table before it ships. In a real product the knowledge itself would come from a maintained
+five concepts and some ninety queries; a sixth concept near an existing one has to be checked against
+the sibling table before it ships — the source-of-funds rule was, and one of its paraphrases rides
+income in at 0.76. In a real product the knowledge itself would come from a maintained
 document taxonomy, or from classifying documents by evidence type at ingest. What it should *not* come
 from is hoping a bigger model has it.
+
+### Where the lexicon comes from
+
+The reader this is for works at a financial-services firm and will type their own queries, so the
+list has to be defensible with a source, not with "I chose these". The frame is the adviser's own
+regulation rather than a vendor's document list: the seed corpus is a UK advisory practice (a
+suitability report, a pension consolidation, an EIS statement, a trust deed, a registered LPA, a CRS
+self-certification), and each rule is grounded in the text that makes its requirement a requirement.
+Every text was read in its current form before it was cited — the JMLSG Guidance Part I (June 2023,
+revised August 2025) for customer due diligence; the FCA Handbook (COBS 9A.2, COBS 19.1, MCOB 11.6);
+the Mental Capacity Act 2005 and the Powers of Attorney Act 1971; HMRC's AEOI manual (IEIM402015,
+IEIM403140) — and quoted in short fragments with the paragraph number. Onfido's public API
+specification was read as one vendor's concrete instance of an address list (18 of its 78 document
+types are accepted as proof of address) and as evidence that such lists vary between firms, not as an
+authority.
+
+**What each rule is and reaches.** `QueryExpanderTest` prints, for every expansion, the documents it
+reaches above the semantic floor that the bare concept does not, and the semantic page every expanding
+golden query produces with the probe that carried each document. The table is read from that run.
+Order is a budget — a query naming one concept runs its first four expansions, a query naming two runs
+two of each — so a probe that reaches nothing seeded goes last.
+
+| Rule (phrasings) | Source | Expansions, in order | What each reaches (cosine) |
+| --- | --- | --- | --- |
+| evidence of address (7) | JMLSG 5.3.75 — "Current council tax demand letter, or statement", a document from "a regulated utility company"; 5.3.76 — "current bank statements, or credit/debit card statements, issued by a regulated financial sector firm in the UK, or utility bills" | utility bill; bank statement; council tax bill | the electricity bill 0.48 (13th for the bare query); the bank statement 0.63 — title-shaped, so it sets the page's floor at 0.44; nothing: the checklist 0.44 and the capital gains computation 0.43 sit under that floor, and no council tax document is seeded |
+| evidence of identity (8) | 5.3.75 — "Valid passport", "Valid photocard driving licence (full or provisional)", "National Identity card"; 5.3.90 — "requiring copy documents to be certified by an appropriate person" | passport; driving licence; national identity card; certified copy of identity document | the onboarding checklist 0.40, 0.45, 0.51, 0.56 — the same document each time — and through the last two the CRS form 0.44, whose TINs were "verified against his Polish identity card" |
+| evidence of income (6) | MCOB 11.6.13G(1) — "Examples of evidence of income … are payslips and bank statements"; 11.6.9G(2) — "checking the level of income regularly paid into a bank account" | salary credit on a bank statement; payslip | the bank statement 0.47, whose only income line is a `SALARY` BACS credit and which the bare query scores 0.31; nothing: the fee agreement 0.31 stays under the floor |
+| acting for someone who has lost capacity (6) | MCA 2005 s.9 — authority only once "registered in accordance with Schedule 1"; s.16(2)(b) — a court-appointed "deputy" | lasting power of attorney attorney appointed; deputy appointed by the court | the LPA 0.67 (rank 1 for the bare query too); nothing: the LPA again at 0.31, and no deputyship order is seeded |
+| source of funds and source of wealth (5) | JMLSG 5.5.32 — "a copy of the relevant will" for inheritance, "evidence of conveyancing" for a property sale; 5.5.6 — "inheritance, divorce settlement, property sale" | proceeds from the sale of a property; inheritance under a will | the capital gains computation 0.54 (bare 0.17 — it itemises the sale proceeds and "Conveyancing fees and disbursements" and never says source of funds), with the buy-to-let review 0.48; the estate-planning notes 0.51 ("Gerald left his entire estate to her"), with the trust deed 0.51 and the policy schedule 0.44 |
+
+Two rules re-find what the bare query already ranks first. Every identity probe reaches the
+onboarding checklist, which the bare queries rank first or second on their own: the corpus holds no
+identity *document*, only the firm's record of the checks, and that record uses the requirement's own
+words. Both capacity goldens were rank 1 before any expansion, and every embedding model measured
+ranked the LPA first. The rules stay for the corpus a reviewer may post: a passport scan (a
+machine-readable zone, "HM Passport Office") or a Court of Protection order is no closer to "proof of
+identity" or "who can act for him" than the electricity bill is to "address proof".
+
+**Named by the texts, measured out.** The texts name more documents than ship, and each was measured
+before it went. `tax return` (MCOB 11.6.9G(5)) put five documents that merely mention self-assessment
+on the income page — the trust deed 0.41, the capital gains computation 0.40, the EIS statement 0.40,
+the annual review 0.39, the suitability report 0.35. Every wording of a pension statement (11.6.15G(2)
+— "pension statement", "pension benefit statement", "statement of pension benefits", "annual benefit
+statement from a pension scheme") scored *Suitability Report: Pension Consolidation* between 0.59 and
+0.68 and the *Annual Benefit Statement* it was meant to reach between 0.46 and 0.52: the probe would
+have handed the income page to a document about consolidating pensions and, at 0.68, set a floor of
+0.47 that cuts the benefit statement itself. `P60 end of year certificate` made the CRS
+*self-certification* the top hit for "proof of income" (0.43, on "certificate") and reached no P60;
+`employment contract salary` reached nothing above 0.33. `mortgage statement` is on the seeded firm's
+own accepted list and not in JMLSG 5.3.75–5.3.76 — the slot where the firm's list diverges from the
+regulator's; it reaches the mortgage offer at 0.52, and it cost "address proof" and "proof of
+address" a rank (4 to 5) for a document the sparse arm already places second on the surname. `tenancy
+agreement` is named by neither: its one reach, the tenancy summary at 0.53, states the *tenants'*
+address — the client is the landlord, care of the letting agent — and it sat second on every address
+page above the bill; without it "something official with her home address on it" moved from third to
+second. `donor best interests decisions` (MCA s.4 is a duty, not an artefact) reached the LPA at
+0.50 and otherwise the estate notes and the trust deed — nothing the first probe lacks. The rename
+`deputy appointed by the Court of Protection` was measured and reversed: the tenancy summary (0.314)
+edged the LPA (0.313). `council tax demand` and `photocard driving licence`, the texts' own surface
+forms, reach the same documents as the shipped wordings (the demand puts the capital gains computation
+first, 0.43) and were not swapped in for an unmeasured vector; the JSON's comment records the forms.
+`HMRC correspondence` and `benefit entitlement letter` as address probes reach the checklist 0.42 and
+the trust deed 0.40, and the trust deed, the EMI summary and the policy schedule at 0.40 — no HMRC
+letter is seeded, and the benefit statement they would pull carries no address.
+
+**The removed rule.** "life cover paid on death" shipped in the first lexicon and is gone. No text
+read makes life cover an evidentiary requirement — COBS 9.2.1R's demands-and-needs test is advice
+content — and the rule encoded what a whole-of-life policy pays rather than which document evidences
+what. Its golden, "payout when the policyholder dies", was rank 1 before the normaliser and is rank 1
+without the rule; "death benefit" alone puts the policy schedule first at 0.55 with the pension
+statement's survivor benefits second at 0.39. With the rule, `policy written in trust beneficiaries`
+scored 0.67 and set a floor of 0.47 that pulled the trust deed (0.62) and the estate-planning notes
+(0.57) onto the page while cutting that pension statement (0.42). Its five phrasings now sit in
+`ConceptFloorTest`'s unrelated list and fire nothing; the nearest lands at 0.42 against the capacity
+rule.
+
+**Considered and rejected.** A tax-residency rule (HMRC IEIM403140 — the self-certification states
+the jurisdictions of tax residence and a TIN for each): "which countries is he tax resident in" is
+rank 1 with no rule, every candidate expansion ("self-certification", "jurisdiction of tax residence",
+"taxpayer identification number") is verbatim in the form so the lexical and sparse arms already carry
+it, and the address rule's "residency proof" is the nearest phrasing at 0.34. (The form declares both
+jurisdictions, which is what IEIM402015 requires from 1 January 2026 — self-certifiers "may not rely on
+tiebreaker rules contained in tax conventions" — while the adviser's note applies the Article 4
+tie-breaker, a tax-computation point rather than a form point.) A pension-transfer rule (COBS 19.1):
+"retirement income planning" and "drawdown sustainability" are rank 1 with no rule, and the scope fact
+matters more than the rule — the Glossary's "pension transfer" is a transfer "in respect of any
+safeguarded benefits", so the seeded *Suitability Report* (three defined-contribution pots) is COBS
+9.2 business with 19.1.1AR(2)'s guaranteed-annuity-rate carve-out, and the *Annual Benefit Statement*
+("safeguarded benefits worth more than £30,000") is the COBS 19.1 document. "CETV" scores 0.24 against
+every phrasing and the lexical arm has no abbreviation table: a stated limit. A suitability-evidence
+rule (COBS 9A.2.1R's knowledge and experience, financial situation, objectives): categories with no
+document attached, present in no seed document; "inconsistent answers on the risk questionnaire"
+(9A.2.9R(2)(d), "obvious inaccuracies") is rank 1 unaided. An interest-only repayment-strategy rule
+(MCOB 11.6.41R(1)(a) — "evidence that the customer will have in place a clearly understood and
+credible repayment strategy"): the offer records it in those words and is rank 1 unaided. Acronyms and
+umbrella vocabulary as phrasings: "KYC documents on file" 0.36, "AML checks on the new client" 0.41
+(towards income), "ID&V for the joint applicant" 0.49, "CDD" 0.30 and "PoA" 0.26 fire nothing, while
+the spelled-out forms do — "customer due diligence identity documents" 0.68 (identity), "verify the
+customer's residential address" 0.72 (address); and "PoA" is genuinely ambiguous in this firm's own
+records, where the checklist files proof of address under `POA-01` and the LPA is a power of attorney.
+Each of these is a row in `ConceptFloorTest` and, where a document answers it, a golden query that
+pins that no rule is needed.
+
+**The limit the lexicon cannot cross.** "proof of income" puts the bank statement first in the
+semantic arm — from 13th before the income rule was re-pointed — and sixth in the fused result. Five
+documents contain both "proof" and "income" for the keyword and sparse arms, and reciprocal rank
+fusion with k = 60 ranks any document two arms find above one that a single arm finds, whatever its
+position (2/65 against 1/61). Phrased "evidence of earnings" the statement is third and "what shows
+how much he earns" second: those are the goldens, and the sixth place is printed by `QueryExpanderTest`
+every run so it stays visible.
+
+**Why this is configuration and not something a model could learn.** The texts set a standard and
+leave the list to the firm. JMLSG 5.3.112 says the guidance "does not require that in all cases a
+customer's address should be verified"; Part I sets no numeric recency for an identity or address
+document — only "current" and "recent" — where the seeded onboarding checklist wants one "dated within
+the last three months"; that checklist refuses the mobile phone bill Onfido's proof-of-address list
+accepts and takes a national identity card "issued by an EEA state" only, a restriction 5.3.77 allows;
+MCOB 11.6.8R accepts income evidence "whether document-based or derived through the use of automated
+systems", and 11.6.50R(2) pushes "the evidential requirements and other controls" for repayment
+strategies into the lender's own policy. Two firms reading the same text produce two lists; this
+file holds one firm's, and the reach table above is what that firm's list does on this corpus. What
+the seeded corpus lacks is worth naming, because the trailing probes exist for it: a payslip, a P60, a
+tax return, a will, a grant of probate, a deputyship order, the council tax demand the checklist
+records receiving, an HMRC letter, an identity document.
 
 ## Fusion
 
@@ -338,13 +474,26 @@ by fusing every combination of the floored arms:
 
 | Arms | hit@5 | MRR |
 | --- | --- | --- |
-| keyword | 13/26 | 0.500 |
-| sparse | 21/26 | 0.767 |
-| semantic | 25/26 | 0.833 |
-| keyword + semantic — the two-arm system | 26/26 | 0.821 |
-| keyword + sparse | 21/26 | 0.767 |
-| **keyword + sparse + semantic** | **26/26** | **0.841** |
-| … with the lexicon's probes through the sparse arm too | 26/26 | 0.860 |
+| keyword | 17/35 | 0.486 |
+| sparse | 26/35 | 0.703 |
+| semantic | 33/35 | 0.829 |
+| keyword + semantic — the two-arm system | 34/35 | 0.812 |
+| keyword + sparse | 26/35 | 0.702 |
+| **keyword + sparse + semantic** | **35/35** | **0.802** |
+| … with the lexicon's probes through the sparse arm too | 34/35 | 0.857 |
+
+Read the hit column before the MRR column. Three arms is the only configuration that finds every
+golden document in the top five; the semantic arm alone misses two and the two-arm system one. The
+MRR ordering is the other way round because of what the nine queries added with the lexicon review
+are: documents that only the lexicon-widened semantic arm reaches (the bank statement for "evidence
+of earnings", the capital gains computation for "evidence of where the invested money came from"),
+and for those every extra arm can only add competitors — a document two arms find outranks one a
+single arm finds, whatever its position ([the fusion limit](#where-the-lexicon-comes-from)). On the 26
+queries before that review the same table read 0.821 for two arms and 0.841 for three, and the
+probes-through-sparse row 0.860; that row now loses a query ("proof of address for Mr Lindqvist"
+drops to ninth when the address probes run through the sparse arm as well), which is one more reason
+it stays unshipped. The ablation applies the product's own tie-break — agreement, then the most
+literal arm, then title — so its three-arm column is the evaluation table's.
 
 (On the 21 queries that predate the paraphrases: two arms 0.810, three arms 0.859, probes through the
 sparse arm 0.859 — the probes column only started to pay once paraphrase queries expanded, and it
@@ -372,7 +521,7 @@ between one install and the next. It was caught by running the evaluation twice.
 
 ## Evaluation
 
-`golden-queries.json` holds 33 queries an advisor might type, each with the one result that must come
+`golden-queries.json` holds 42 queries an advisor might type, each with the one result that must come
 back. `SearchQualityTest` asserts every one lands in the top five and prints mean reciprocal rank, so
 a change that keeps every query passing while pushing results down the list is still visible. Three
 document queries were added with the sparse arm, each a partial-term query the lexical AND cannot
@@ -380,14 +529,19 @@ answer ("electricity supplier statement" — `supplier` is absent); on the origi
 two-arm system scored 0.778 and the three-arm one 0.835. Five more came with the semantic normaliser:
 two paraphrases of the address requirement that no phrase in the lexicon appears in — unreachable
 before it — and one paraphrase per other concept that already passed on meaning alone, pinned so a
-concept firing on it never costs the rank. The hard case is stated as measured: for "documents that
-show where the client lives" the normaliser reaches the address rule at 0.81 and the bank statement,
-which carries the address, ranks second; the electricity bill is sixth, behind the documents that
-state an address and two partial sparse matches.
+concept firing on it never costs the rank. Nine more came with the review of the lexicon against its
+sources ([above](#where-the-lexicon-comes-from)): two the income rule earns ("evidence of earnings"
+and "what shows how much he earns" — the bank statement says neither word), one the source-of-funds
+rule earns ("evidence of where the invested money came from" — the capital gains computation), and
+six pins: requirements the texts name for which no rule exists, and a rejected probe's document,
+placed where meaning and the sparse arm already put them. The hard case is stated as measured: for
+"documents that show where the client lives" the normaliser reaches the address rule at 0.81 and the
+bank statement, which carries the address, ranks second; the electricity bill is fourth, behind the
+statement and two partial sparse matches.
 
 | Set | Queries | hit@5 | MRR |
 | --- | --- | --- | --- |
-| Documents | 26 | 26/26 | 0.841 (0.859 on the original 21) |
+| Documents | 35 | 35/35 | 0.802 (0.847 on the 26 before the lexicon review, 0.859 on the original 21) |
 | Clients | 7 | 7/7 | 0.929 |
 
 The single client query not at rank 1 is "retired teacher", which ties a retired *teacher* with a
@@ -420,7 +574,8 @@ comparable, even though they are not across queries. Measured on the evaluation 
 query is really about is the top semantic hit for 15 of 18 queries and never scores below **0.76** of
 the best hit. Keeping documents at **0.70** of the best therefore loses none of them and drops the
 long tail: before this, "address proof" returned ten documents including a trust deed and a mortgage
-offer; now it returns exactly the four that can evidence an address.
+offer; now it returns the two that state one — the bank statement and the bill — and, for "proof of
+address", the checklist that lists what is accepted.
 
 **The lexical floor is relative too**, because `ts_rank_cd` spans three orders of magnitude on this
 corpus and has no meaningful absolute scale. Measured across the evaluation queries, genuine

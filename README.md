@@ -220,7 +220,7 @@ numbers per combination, which is how the third arm earned its place.
 
 | | |
 | --- | --- |
-| Retrieval quality | documents 26/26 hit@5 (MRR 0.841; 0.859 on the 21 that predate the paraphrase queries, where the two-arm fusion scores 0.810), clients 7/7 (MRR 0.929) |
+| Retrieval quality | documents 35/35 hit@5 (MRR 0.802; 0.847 on the 26 before the lexicon review and 0.859 on the 21 that predate the paraphrase queries, where the two-arm fusion scores 0.810), clients 7/7 (MRR 0.929) |
 | `GET /search`, warm | 17 ms median, 45 ms when a query expands to five probes (68 before the expansions' vectors were precomputed) — the query's one forward pass and the lexicon match are about 3 ms of either, the sparse arm 1–3 ms; the rest is the semantic arm's scans, one per probe |
 | Under concurrency | p95 150 ms at 20 concurrent clients, 115 req/s |
 | Ingest | 0.93 s for a 10 KB document, 6.5 s at the 100,000-character cap — two models per chunk, and past the point at which the design says ingest should go asynchronous |

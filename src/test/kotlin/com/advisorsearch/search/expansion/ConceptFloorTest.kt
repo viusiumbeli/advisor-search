@@ -39,27 +39,53 @@ class ConceptFloorTest(
                     "something official with her home address on it",
                     "what can he send to show where he lives",
                     "confirm the client's residential address",
+                    "proof of residence",
+                    "residential address evidence for customer due diligence",
                 ),
             "evidence of identity" to
-                listOf("how does she prove who she is", "confirm the client is who he says he is", "what ID do we need from him"),
-            "evidence of income" to listOf("what shows how much he earns", "documents confirming annual earnings"),
+                listOf(
+                    "how does she prove who she is",
+                    "confirm the client is who he says he is",
+                    "what ID do we need from him",
+                    "verify the customer's identity",
+                ),
+            "evidence of income" to
+                listOf(
+                    "what shows how much he earns",
+                    "documents confirming annual earnings",
+                    "income verification for the mortgage application",
+                    "evidence of the income declared",
+                ),
             "acting for someone who has lost capacity" to
                 listOf(
                     "who makes decisions if he can no longer manage his affairs",
                     "someone to run his finances if he becomes unable to",
                     "who can act for a client if they lose capacity",
+                    "can the attorneys act while he still has capacity",
+                    "is the LPA registered with the Office of the Public Guardian",
                 ),
-            "life cover paid on death" to
-                listOf("payout when the policyholder dies", "what the family receives when she dies", "sum paid out on death"),
+            "source of funds and source of wealth" to
+                listOf(
+                    "where did the money she is investing come from",
+                    "how did he build up his wealth",
+                    "evidence of where the invested money came from",
+                ),
         )
 
     /** Measured under the absolute floor and left there: the limit of the normaliser, stated rather than tuned around. */
     private val belowTheFloor =
-        setOf("what can he send to show where he lives", "what ID do we need from him", "what the family receives when she dies")
+        setOf(
+            "what can he send to show where he lives",
+            "what ID do we need from him",
+            "is the LPA registered with the Office of the Public Guardian",
+        )
 
     /** Sibling concepts measured within the ratio on a single-concept query, allowed and listed. */
     private val siblingsAllowed =
-        mapOf("confirm the client is who he says he is" to setOf("evidence of address", "evidence of income"))
+        mapOf(
+            "confirm the client is who he says he is" to setOf("evidence of address", "evidence of income"),
+            "evidence of where the invested money came from" to setOf("evidence of income"),
+        )
 
     /** A phrasing inside a longer sentence — what substring matching used to handle. */
     private val sentences =
@@ -67,16 +93,26 @@ class ConceptFloorTest(
             "I need proof of address for Jane Roe" to "evidence of address",
             "please find the power of attorney for Mr Ashworth-Bell" to "acting for someone who has lost capacity",
             "does the file hold a proof of identity for the joint applicant" to "evidence of identity",
-            "send me the death benefit details on the Okonkwo policy" to "life cover paid on death",
+            "we still need proof of income for the Lindqvist remortgage" to "evidence of income",
+            "please confirm the source of funds for Mrs Moreau's GIA" to "source of funds and source of wealth",
         )
 
+    /** Requirements named together, as an onboarding or mortgage file lists them (JMLSG 5.3.99–5.3.101 for the attorneys). */
     private val twoConcepts =
         mapOf(
             "proof of address and proof of identity" to setOf("evidence of address", "evidence of identity"),
             "identity and address documents for onboarding" to setOf("evidence of address", "evidence of identity"),
-            "power of attorney and life cover for the estate" to
-                setOf("acting for someone who has lost capacity", "life cover paid on death"),
+            "proof of address and proof of income for the mortgage application" to setOf("evidence of address", "evidence of income"),
+            "identity documents and proof of income for onboarding" to setOf("evidence of identity", "evidence of income"),
         )
+
+    /**
+     * Two-concept queries whose second concept measures under the ratio and is left there: an exact
+     * phrasing of one rule ("power of attorney", 0.81) sets a bar the other half does not reach (0.74 of
+     * it). Listed, like the paraphrases under the floor; the lever is a phrasing, never a lower ratio.
+     */
+    private val secondUnderTheRatio =
+        mapOf("power of attorney and proof of identity for the attorneys" to "acting for someone who has lost capacity")
 
     /**
      * Questions about a concept's own topic that ask for a value rather than for evidence. Reported,
@@ -94,10 +130,31 @@ class ConceptFloorTest(
             "what is his annual salary",
             "how much does she earn",
             "who is the attorney named on the LPA",
-            "when did the policyholder die",
         )
 
-    /** Golden queries about nothing in the lexicon, the golden client queries, nonsense and reference codes: none may fire. */
+    /**
+     * The regulation's own vocabulary and the firm's file references, as a compliance reader might type
+     * them. Reported, not policed: umbrella terms (KYC, CDD, AML) name identity and address at once, and
+     * "PoA" is proof of address in the onboarding checklist's own filing (POA-01) but a power of attorney
+     * everywhere else — so none of them is a phrasing, and the table shows what each one does reach.
+     */
+    private val regulatoryVocabulary =
+        listOf(
+            "customer due diligence identity documents",
+            "KYC documents on file",
+            "AML checks on the new client",
+            "ID&V for the joint applicant",
+            "verify the customer's residential address",
+            "PoA",
+            "POA-01",
+            "CDD",
+            "CETV",
+        )
+
+    /**
+     * Golden queries about nothing in the lexicon, the golden client queries, nonsense, reference codes,
+     * and the phrasings of the removed "life cover paid on death" rule: none may fire.
+     */
     private val unrelated =
         listOf(
             "utility bill",
@@ -117,6 +174,17 @@ class ConceptFloorTest(
             "electricity supplier statement",
             "meter readings kWh unit rate",
             "tax agreement between two countries",
+            "inconsistent answers on the risk questionnaire",
+            "which countries is he tax resident in",
+            "repayment strategy for the interest-only mortgage",
+            "proceeds of the Bath property sale",
+            "payout when the policyholder dies",
+            "what the family receives when she dies",
+            "sum paid out on death",
+            "death benefit",
+            "life cover",
+            "send me the death benefit details on the Okonkwo policy",
+            "when did the policyholder die",
             "AldgateWealth",
             "aldgatewealth.example",
             "raghunathan",
@@ -219,6 +287,11 @@ class ConceptFloorTest(
             weakestSecond = minOf(weakestSecond, scored[1].similarity / scored[0].similarity)
             if (fired.toSet() != intended) failures += "  \"$query\" -> expected $intended, fired $fired"
         }
+        secondUnderTheRatio.forEach { (query, first) ->
+            val fired = expander.expand(query).concepts.map { it.concept }
+            print(query, expander.similarities(query), fired)
+            if (fired != listOf(first)) failures += "  \"$query\" is listed with its second concept under the ratio but fired $fired"
+        }
 
         println(
             "weakest second concept, as a share of the first: %.4f against a ratio of %.2f".format(
@@ -232,6 +305,13 @@ class ConceptFloorTest(
     @Test
     fun `content questions about a concept's own topic are reported, not policed`() {
         contentQuestions.forEach { query -> print(query, expander.similarities(query), expander.expand(query).concepts.map { it.concept }) }
+    }
+
+    @Test
+    fun `the regulation's own vocabulary is reported, not policed`() {
+        regulatoryVocabulary.forEach { query ->
+            print(query, expander.similarities(query), expander.expand(query).concepts.map { it.concept })
+        }
     }
 
     private fun print(

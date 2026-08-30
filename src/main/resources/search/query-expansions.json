@@ -15,9 +15,48 @@
     "address' dragging 'evidence of identity' in. So 'documents that show where the client lives' reaches",
     "the address rule though none of its words appear here. Paraphrases are examples, not a list to",
     "complete: state the requirement the way an advisor would, avoid words every client query carries",
-    "('client' on its own pulls unrelated queries towards a rule), add one when a real query shows up in",
-    "the search log with concepts=[] and should not have, then run ConceptFloorTest and read its table —",
-    "a phrasing close to another rule's wording narrows the margin between them.",
+    "('client' on its own pulls unrelated queries towards a rule) and acronyms ('photo ID' became the",
+    "nearest phrasing for reference codes and nonsense), add one when a real query shows up in the search",
+    "log with concepts=[] and should not have, then run ConceptFloorTest and read its table — a phrasing",
+    "close to another rule's wording narrows the margin between them.",
+    "Each rule's expansions are the documents a UK firm may rely on for that requirement, and their order",
+    "is a budget: a query naming one concept runs the first four, a query naming two runs two of each, so a",
+    "fifth would never run, and a probe that reaches nothing in the seeded corpus (payslip, council tax",
+    "bill, deputy appointed by the court) sits after the ones that do — it is there for a corpus that holds",
+    "one, and a two-concept query never spends a slot on it. QueryExpanderTest prints what each probe",
+    "reaches; docs/search-design.md, 'Where the lexicon comes from', has the table.",
+    "Sources, read in their current text. Address: JMLSG Guidance Part I (June 2023, revised August 2025)",
+    "5.3.75 — 'Current council tax demand letter, or statement' and a document from 'a regulated utility",
+    "company' — and 5.3.76 — 'current bank statements, or credit/debit card statements, issued by a",
+    "regulated financial sector firm in the UK, or utility bills'. Identity: 5.3.75's photographic list —",
+    "'Valid passport', 'Valid photocard driving licence (full or provisional)', 'National Identity card' —",
+    "and 5.3.90's control of 'requiring copy documents to be certified by an appropriate person'. Income:",
+    "FCA MCOB 11.6.13G(1) 'Examples of evidence of income ... are payslips and bank statements' and",
+    "11.6.9G(2) 'checking the level of income regularly paid into a bank account'. Capacity: Mental Capacity",
+    "Act 2005 s.9, under which a lasting power of attorney confers authority only once 'registered in",
+    "accordance with Schedule 1', and s.16(2)(b), the court-appointed 'deputy'. Source of funds and wealth:",
+    "JMLSG 5.5.32 — 'a copy of the relevant will' where wealth comes from inheritance, 'evidence of",
+    "conveyancing' where it comes from the sale of property.",
+    "Named by the texts and measured out: 'tax return' (MCOB 11.6.9G(5)) put five documents that merely",
+    "mention self-assessment on the income page; every wording of 'pension statement' (11.6.15G(2)) scored",
+    "the suitability report on pension consolidation above the benefit statement it was meant to reach",
+    "(0.61–0.68 against 0.50–0.52). 'mortgage statement' is on the seeded firm's own accepted list and not",
+    "in JMLSG; it cost 'address proof' a rank (4 to 5) for a document the sparse arm already finds.",
+    "'tenancy agreement' is named by neither, and its only reach here was the tenants' address, not the",
+    "client's.",
+    "These lists are configuration, not something a model could learn, because the texts set a standard",
+    "and leave the list to the firm. JMLSG 5.3.112 says the guidance 'does not require that in all cases a",
+    "customer's address should be verified', and Part I sets no numeric recency for an identity or address",
+    "document — only 'current' and 'recent' — where the seeded onboarding checklist wants one 'dated within",
+    "the last three months'; that checklist refuses the mobile phone bill which Onfido's proof-of-address",
+    "list (18 of the 78 document types in its public API specification) accepts, and takes a national",
+    "identity card 'issued by an EEA state' only, a restriction 5.3.77 allows. Two firms reading the same",
+    "text produce two lists; this file holds one firm's.",
+    "'life cover paid on death' shipped in the first version and was removed: no text makes life cover an",
+    "evidentiary requirement, the policy schedule is the top result for its phrasings on meaning alone",
+    "(0.55 for 'death benefit'), and its probes only raised the relative floor — 'policy written in trust",
+    "beneficiaries' at 0.67 pulled the trust deed and the estate-planning notes onto the page while cutting",
+    "the pension statement that also states a death benefit.",
     "Expansions widen the semantic arm only. The lexical arm exists to match exact tokens, and OR-ing",
     "extra terms into it would cost precision for recall the semantic arm already provides; the sparse arm",
     "was measured with the probes and without and they changed no rank, only page length."
@@ -26,27 +65,27 @@
     {
       "concept": "evidence of address",
       "paraphrases": ["address proof", "proof of address", "address verification", "evidence of address", "residency proof", "something that shows where the client lives", "something that confirms the client's home address"],
-      "expansions": ["utility bill", "council tax bill", "bank statement", "tenancy agreement"]
+      "expansions": ["utility bill", "bank statement", "council tax bill"]
     },
     {
       "concept": "evidence of identity",
       "paraphrases": ["proof of identity", "identity proof", "id document", "identity verification", "identity documents", "a way to prove who someone is", "how a person proves their identity", "confirming that a person is who they say they are"],
-      "expansions": ["passport", "driving licence", "photographic identification", "certified copy of identity document"]
+      "expansions": ["passport", "driving licence", "national identity card", "certified copy of identity document"]
     },
     {
       "concept": "evidence of income",
       "paraphrases": ["proof of income", "income proof", "evidence of earnings", "proof of earnings", "proof of what the client earns", "evidence of the client's earnings"],
-      "expansions": ["payslip", "P60 end of year certificate", "tax return", "employment contract salary"]
+      "expansions": ["salary credit on a bank statement", "payslip"]
     },
     {
       "concept": "acting for someone who has lost capacity",
       "paraphrases": ["power of attorney", "lost capacity", "loss of capacity", "mental capacity", "who can act for someone who can no longer manage their own affairs", "someone appointed to make decisions for a person who has lost capacity"],
-      "expansions": ["lasting power of attorney attorney appointed", "donor best interests decisions", "deputy appointed by the court"]
+      "expansions": ["lasting power of attorney attorney appointed", "deputy appointed by the court"]
     },
     {
-      "concept": "life cover paid on death",
-      "paraphrases": ["death benefit", "life cover", "life assurance payout", "sum assured on death", "what the life policy pays out on death"],
-      "expansions": ["sum assured payable on death", "policy written in trust beneficiaries", "whole of life policy schedule"]
+      "concept": "source of funds and source of wealth",
+      "paraphrases": ["source of funds", "source of wealth", "where did the money come from", "how the money being invested was acquired", "origin of the funds"],
+      "expansions": ["proceeds from the sale of a property", "inheritance under a will"]
     }
   ]
 }
