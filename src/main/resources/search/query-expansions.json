@@ -9,12 +9,19 @@
     "them and search.concept-floor-ratio of the best rule's score. So paraphrases are examples, not a list to",
     "complete — state the requirement as an advisor would, and keep out acronyms and words every query about a",
     "person carries ('client', 'he', 'her'), which drag unrelated queries in.",
-    "Expansions are document types named as a regulator or an advisor names them, ordered by how commonly a",
-    "client file holds one. Membership and order come from the governing text and adviser practice, never from",
-    "what the seeded demo corpus contains — it is twenty documents and lacks most of these types, so 'reaches",
-    "nothing seeded' is a fact about the seed. Only the first four run for a query naming one concept, and two",
-    "per rule for a query naming two, so the order is a budget and a later entry is there for a corpus that",
-    "holds one. Expansions widen the semantic arm only.",
+    "A rule carries two lists, split by which arm can use them. document_types is what an advisor CALLS the",
+    "document ('utility bill'): embedded at startup and run as semantic probes, four per query. document_phrases",
+    "is text the DOCUMENT ITSELF carries in its own words ('supply address', 'gross pay', 'proprietorship",
+    "register'): never embedded, run as one extra full-text query and as sparse probes, because such a phrase IS",
+    "the exact token those arms exist to match — where a type name is not, since a document never says what type",
+    "it is. Order matters in both: the first four types are the semantic budget and the first four phrases are",
+    "the sparse one, while the full-text side takes them all in one scan.",
+    "Types come from the governing text and adviser practice, ordered by how commonly a client file holds one.",
+    "Phrases must be text a real document of one of that rule's types carries: EvidenceFixtureTest gates each",
+    "one — at least two lexemes after stemming, no match against any rule's concept, paraphrases or types (a",
+    "phrase that restates a type name reproduces the bug this split fixes), a carrier among that rule's own",
+    "documents, and reachable through the arm. The seeded demo corpus decides neither list — it is twenty",
+    "documents and lacks most of these types, so 'reaches nothing seeded' is a fact about the seed.",
     "After editing run ConceptFloorTest (the floors, the sibling matrix and the listed exceptions) and",
     "EvidenceFixtureTest, which holds one held-out document per type and asserts that each probe places its",
     "own. Every rule's source, what each probe reaches, the requirements enumerated and rejected, and why this",
@@ -25,57 +32,68 @@
     {
       "concept": "evidence of address",
       "paraphrases": ["address proof", "proof of address", "address verification", "evidence of address", "residency proof", "something that shows where the client lives", "something that confirms the client's home address"],
-      "expansions": ["utility bill", "bank statement", "council tax bill", "mortgage statement", "benefit award letter", "HMRC correspondence", "tenancy agreement", "record of a home visit"]
+      "document_types": ["utility bill", "bank statement", "council tax bill", "mortgage statement", "benefit award letter", "HMRC correspondence", "tenancy agreement", "record of a home visit"],
+      "document_phrases": ["supply address", "meter serial number", "billing period", "sort code", "valuation band", "mortgaged property", "deposit protection", "paye coding notice", "weekly amount", "file note of home visit"]
     },
     {
       "concept": "evidence of identity",
       "paraphrases": ["proof of identity", "identity proof", "id document", "identity verification", "identity documents", "a way to prove who someone is", "how a person proves their identity", "confirming that a person is who they say they are"],
-      "expansions": ["passport", "driving licence", "national identity card", "certified copy of identity document", "firearms certificate"]
+      "document_types": ["passport", "driving licence", "national identity card", "certified copy of identity document", "firearms certificate"],
+      "document_phrases": ["date of expiry", "given names", "holder's signature", "machine readable zone", "issuing authority", "true and complete copy", "bears a true likeness", "provisional entitlement", "authorised to possess"]
     },
     {
       "concept": "evidence of income",
       "paraphrases": ["proof of income", "income proof", "evidence of earnings", "proof of earnings", "proof of what the client earns", "evidence of the client's earnings"],
-      "expansions": ["payslip", "bank statement", "pension statement", "P60 end of year certificate", "tax return", "employment contract"]
+      "document_types": ["payslip", "bank statement", "pension statement", "P60 end of year certificate", "tax return", "employment contract"],
+      "document_phrases": ["gross pay", "net pay", "basic salary", "pay in this employment", "tax deducted", "continuous employment began", "total income received", "pensionable pay"]
     },
     {
       "concept": "authority to act for another person",
       "paraphrases": ["power of attorney", "lost capacity", "loss of capacity", "mental capacity", "who can act for someone who can no longer manage their own affairs", "someone appointed to make decisions for a person who has lost capacity", "who is authorised to act on her behalf", "authority to give instructions for another person", "attorney or deputy authorised to deal with the account"],
-      "expansions": ["lasting power of attorney", "enduring power of attorney", "court order appointing a deputy", "grant of probate", "general power of attorney"]
+      "document_types": ["lasting power of attorney", "enduring power of attorney", "court order appointing a deputy", "grant of probate", "general power of attorney"],
+      "document_phrases": ["office of the public guardian", "lacks capacity", "property and affairs", "powers of attorney act", "administration of the estate"]
     },
     {
       "concept": "source of funds and source of wealth",
       "paraphrases": ["source of funds", "source of wealth", "where did the money come from", "how the money being invested was acquired", "origin of the funds"],
-      "expansions": ["completion statement from a property sale", "copy of the will", "grant of probate", "financial remedy consent order", "death certificate", "audited accounts", "tax return", "payslip"]
+      "document_types": ["completion statement from a property sale", "copy of the will", "grant of probate", "financial remedy consent order", "death certificate", "audited accounts", "tax return", "payslip"],
+      "document_phrases": ["net proceeds of sale", "completion date", "residue of my estate", "gross value of the estate", "pension sharing order", "financial remedy order", "entry of death", "cause of death", "true and fair view", "total income received"]
     },
     {
       "concept": "beneficial ownership of a company or trust",
       "paraphrases": ["beneficial owner", "who ultimately owns the company", "ownership and control structure", "who controls the company", "ultimate beneficial ownership of the entity", "who owns and controls the business"],
-      "expansions": ["Companies House confirmation statement", "shareholder register", "register of people with significant control", "trust deed"]
+      "document_types": ["Companies House confirmation statement", "shareholder register", "register of people with significant control", "trust deed"],
+      "document_phrases": ["nature of control", "voting rights", "class of shares", "shareholder information", "statement of capital", "deed of settlement", "trust registration service"]
     },
     {
       "concept": "evidence of property ownership",
       "paraphrases": ["proof of ownership of the property", "evidence of who owns the property", "who owns the house", "title to the property", "confirm ownership of the home", "is the property owned outright"],
-      "expansions": ["Land Registry title register", "title plan", "title deeds"]
+      "document_types": ["Land Registry title register", "title plan", "title deeds"],
+      "document_phrases": ["proprietorship register", "title absolute", "charges register", "register of title", "official copy of register", "freehold land", "title number", "edged with red", "fee simple"]
     },
     {
       "concept": "evidence of assets",
       "paraphrases": ["evidence of assets", "statement of assets", "proof of savings and investments", "valuation of investments", "list of savings, investments and property", "total value of capital held"],
-      "expansions": ["investment portfolio valuation", "ISA statement", "savings account statement", "pension statement", "property valuation report", "share certificate", "Land Registry title register", "endowment policy statement"]
+      "document_types": ["investment portfolio valuation", "ISA statement", "savings account statement", "pension statement", "property valuation report", "share certificate", "Land Registry title register", "endowment policy statement"],
+      "document_phrases": ["total portfolio value", "book cost", "unrealised gain", "subscriptions this tax year", "gross interest", "closing balance", "cash equivalent transfer value", "reinstatement cost", "registered holder", "surrender value"]
     },
     {
       "concept": "evidence of liabilities",
       "paraphrases": ["evidence of liabilities", "outstanding debts", "amounts owed on loans and credit cards", "details of borrowing", "credit commitments", "existing loans and credit cards"],
-      "expansions": ["mortgage statement", "credit card statement", "bank statement", "loan agreement", "credit report", "hire purchase agreement"]
+      "document_types": ["mortgage statement", "credit card statement", "bank statement", "loan agreement", "credit report", "hire purchase agreement"],
+      "document_phrases": ["amount of credit", "consumer credit act", "balance outstanding", "cash price", "credit limit", "minimum payment", "credit accounts", "capital and interest"]
     },
     {
       "concept": "evidence of expenditure",
       "paraphrases": ["evidence of expenditure", "monthly outgoings", "monthly spending", "committed expenditure", "regular financial commitments", "monthly living costs"],
-      "expansions": ["bank statement", "credit card statement", "council tax bill", "utility bill", "hire purchase agreement", "buildings insurance schedule", "ground rent and service charge demand", "child maintenance arrangement"]
+      "document_types": ["bank statement", "credit card statement", "council tax bill", "utility bill", "hire purchase agreement", "buildings insurance schedule", "ground rent and service charge demand", "child maintenance arrangement"],
+      "document_phrases": ["total payments", "standing charge", "single person discount", "sum insured", "annual premium", "estimated expenditure", "reserve fund", "minimum payment", "paying parent"]
     },
     {
       "concept": "repayment strategy for an interest-only mortgage",
       "paraphrases": ["repayment vehicle", "how the interest-only mortgage will be repaid", "evidence of the repayment strategy", "repayment plan for the mortgage capital", "what will pay off the mortgage at the end of the term"],
-      "expansions": ["ISA statement", "investment portfolio valuation", "endowment policy statement", "savings account statement", "pension statement", "property valuation report"]
+      "document_types": ["ISA statement", "investment portfolio valuation", "endowment policy statement", "savings account statement", "pension statement", "property valuation report"],
+      "document_phrases": ["target amount", "projected maturity value", "maturity date", "surrender value", "subscriptions this tax year", "total portfolio value"]
     }
   ]
 }

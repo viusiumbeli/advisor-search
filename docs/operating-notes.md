@@ -14,11 +14,11 @@ Every number here and in [Load and limits](load-and-limits.md) was measured on a
 | --- | --- |
 | `docker compose up` from clean to healthy | 21–27 s (two runs) |
 | Application start | 4.0 s |
-| Model warm-ups at startup | 20–60 ms dense, 50–70 ms sparse; the expansion lexicon (77 phrasings and 67 expansions) embedded in 0.3–0.6 s across two starts |
+| Model warm-ups at startup | 20–60 ms dense, 50–70 ms sparse; the expansion lexicon (77 phrasings and 67 document types) embedded in 0.3–0.6 s across two starts, its 91 document phrases read but never embedded |
 | Seeding 20 documents through the real ingest path | 13.4 s |
 | Ingesting a 10 KB document (13 chunks) | 1.14 s: 348 ms dense, 729 ms sparse |
-| `GET /search`, one probe, warm | 17 ms median (server side 12–16 ms: the query's forward pass and lexicon match 2–4 ms, keyword 1–2 ms, sparse 1–2 ms, one semantic scan 7–9 ms) |
-| `GET /search`, expanded to five probes, warm | 45 ms median (server side 41–43 ms; the expansions' vectors are precomputed, so the difference is four more semantic scans at ~34 ms together) |
+| `GET /search`, one probe, warm | 19 ms median (server side 16 ms: the query's forward pass and lexicon match 2–4 ms, keyword 3 ms, phrase 3 µs — no concept fired, so no query is issued — sparse 2 ms, one semantic scan 7 ms) |
+| `GET /search`, expanded to five probes, warm | 50 ms median (server side 47 ms; the document types' vectors are precomputed, so most of the difference is four more semantic scans at ~32 ms together, plus the lexicon's phrases: one extra full-text scan at 1–2 ms and four more sparse probes taking that arm from 2 ms to 4–5 ms) |
 | Test suite (139 tests, from clean, no build cache) | 41 s |
 | API container resident memory | 1.37 GiB after seeding and 1.52 GiB after a 99 KB ingest under a 2 GB limit; 1.6–1.8 GiB with no limit, where the heap is left to grow |
 | Image size | 716 MB |

@@ -25,8 +25,10 @@ private const val MAX_PROBES = 5
  * never could. The floors that bound the model's say are calibrated in `ConceptFloorTest` and written
  * up in docs/search-design.md, "Matching a query to a concept".
  *
- * Expansion widens the semantic arm only: the lexical arm's value is precision, and the sparse arm was
- * measured with the probes and without — same ranks, longer pages.
+ * A rule carries two lists and each goes to the arm that can use it. Its document types are embedded
+ * and widen the semantic arm, as they always have. Its document phrases are text the documents
+ * themselves carry, so they widen the arms that match tokens — one more full-text query and a few
+ * sparse probes — and they are never embedded, which is why they cost no part of the probe ceiling.
  */
 @Component
 class QueryExpander(
@@ -44,24 +46,32 @@ class QueryExpander(
         val (embedded, elapsed) =
             measureTimedValue {
                 lexicon.map { rule ->
-                    EmbeddedRule(rule.concept, probesOf((listOf(rule.concept) + rule.paraphrases).distinct()), probesOf(rule.expansions))
+                    require(rule.documentPhrases.none(String::isBlank)) { "${rule.concept} has a blank document phrase" }
+                    EmbeddedRule(
+                        rule.concept,
+                        probesOf((listOf(rule.concept) + rule.paraphrases).distinct()),
+                        probesOf(rule.documentTypes),
+                        rule.documentPhrases,
+                    )
                 }
             }
         rules = embedded
         log.info(
-            "Loaded {} query expansion rules; embedded {} phrasings and {} expansions in {}",
+            "Loaded {} query expansion rules; embedded {} phrasings and {} document types in {}, and read {} document phrases",
             rules.size,
             rules.sumOf { it.phrasings.size },
-            rules.sumOf { it.expansions.size },
+            rules.sumOf { it.documentTypes.size },
             elapsed,
+            rules.sumOf { it.phrases.size },
         )
     }
 
     /**
-     * The query embedded once, the concepts it comes near enough to, and the probes that follow: the
-     * user's own words first, then the expansions of every matched concept, interleaved. A query about
-     * nothing in the lexicon costs one forward pass — which the semantic arm needed anyway — and a few
-     * dozen dot products.
+     * The query embedded once, the concepts it comes near enough to, and what each matched rule adds:
+     * probes for the semantic arm — the user's own words first, then the matched concepts' document
+     * types, interleaved — and the same rules' document phrases for the arms that match text. A query
+     * about nothing in the lexicon costs one forward pass, which the semantic arm needed anyway, and a
+     * few dozen dot products; it adds no phrases, so it issues no extra query either.
      */
     fun expand(query: String): Expansion {
         val vector = embeddings.embedQuery(query)
@@ -72,10 +82,16 @@ class QueryExpander(
         // query keeps both, and only weaker also-rans are pruned.
         val floor = maxOf(properties.conceptFloor, scored.first().similarity * properties.conceptFloorRatio)
         val matched = scored.filter { it.similarity >= floor }
-        val expansions = interleave(matched.map { match -> rules.first { it.concept == match.concept }.expansions })
-        val probes = (listOf(Probe(query, vector)) + expansions).distinctBy(Probe::text).take(MAX_PROBES)
-        if (matched.isNotEmpty()) log.debug("Expanded '{}' via {} into {} probes", query, matched, probes.size)
-        return Expansion(query, probes, matched)
+        val matchedRules = matched.map { match -> rules.first { it.concept == match.concept } }
+        val types = interleave(matchedRules.map { it.documentTypes })
+        val probes = (listOf(Probe(query, vector)) + types).distinctBy(Probe::text).take(MAX_PROBES)
+        // Uncapped, unlike the probes: the lexical arm spends one scan however many phrases it is
+        // given, and the arm that does pay per phrase applies its own ceiling.
+        val phrases = interleave(matchedRules.map { it.phrases }).distinct()
+        if (matched.isNotEmpty()) {
+            log.debug("Expanded '{}' via {} into {} probes and phrases {}", query, matched, probes.size, phrases)
+        }
+        return Expansion(query, probes, phrases, matched)
     }
 
     /** Every rule's nearest phrasing to [query], unfloored, strongest first — what [expand] cuts and `ConceptFloorTest` tabulates. */
@@ -98,18 +114,20 @@ class QueryExpander(
      * nothing to say they were ever considered. Now that paraphrases reach rules too, more queries
      * meet the ceiling, and what it guarantees is one expansion per concept rather than several.
      */
-    private fun interleave(expansions: List<List<Probe>>): List<Probe> {
-        if (expansions.isEmpty()) return emptyList()
-        val deepest = expansions.maxOf { it.size }
-        return (0..<deepest).flatMap { position -> expansions.mapNotNull { it.getOrNull(position) } }
+    private fun <T> interleave(lists: List<List<T>>): List<T> {
+        if (lists.isEmpty()) return emptyList()
+        val deepest = lists.maxOf { it.size }
+        return (0..<deepest).flatMap { position -> lists.mapNotNull { it.getOrNull(position) } }
     }
 }
 
-/** A rule with its phrasings and expansions embedded: working state, like `Candidate` in SearchService.kt. */
+/** A rule with its phrasings and document types embedded: working state, like `Candidate` in SearchService.kt. */
 private class EmbeddedRule(
     val concept: String,
     val phrasings: List<Probe>,
-    val expansions: List<Probe>,
+    val documentTypes: List<Probe>,
+    /** Text, not vectors: these never meet the dense model. */
+    val phrases: List<String>,
 )
 
 /** Both vectors are unit length — OnnxEmbedder normalises — so the dot product is the cosine, the number `1 - (a <=> b)` gives in Postgres. */

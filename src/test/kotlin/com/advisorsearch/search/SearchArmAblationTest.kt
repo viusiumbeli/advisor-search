@@ -25,14 +25,23 @@ class SearchArmAblationTest(
 ) : SeededIntegrationTest() {
     private val golden: GoldenSet = objectMapper.readValue(ClassPathResource("golden-queries.json").inputStream)
 
+    /**
+     * `sparse` is that arm without the lexicon's phrases — what every number published before this
+     * change was measured with, so those rows stay comparable — and `sparse(phrases)` is what
+     * production runs. The pair is the measurement of what the phrases cost that arm.
+     */
     private val configurations =
         listOf(
             "keyword",
+            "phrase",
             "sparse",
             "semantic",
             "keyword+semantic",
             "keyword+sparse",
             "keyword+sparse+semantic",
+            "keyword+phrase+semantic",
+            "keyword+phrase+sparse+semantic",
+            "keyword+phrase+sparse(phrases)+semantic",
             "keyword+sparse(probes)+semantic",
         )
 
@@ -45,12 +54,19 @@ class SearchArmAblationTest(
         golden.documents.forEach { case ->
             val arms = service.documentArms(case.query)
             val probed = service.documentArms(case.query, expandSparse = true)
-            val titles = (arms.keyword + arms.sparse + arms.semantic + probed.sparse).associate { it.reference.id to it.reference.title }
+            // The sparse arm without the lexicon's phrases: what every published row below was
+            // measured with, so those numbers stay comparable to the ones already in the docs.
+            val bare = service.documentArms(case.query, sparsePhrases = false)
+            val titles =
+                (arms.keyword + arms.phrase + arms.sparse + arms.semantic + probed.sparse + bare.sparse)
+                    .associate { it.reference.id to it.reference.title }
             val lists =
                 mapOf(
                     "keyword" to arms.keyword,
-                    "sparse" to arms.sparse,
+                    "phrase" to arms.phrase,
+                    "sparse" to bare.sparse,
                     "semantic" to arms.semantic,
+                    "sparse(phrases)" to arms.sparse,
                     "sparse(probes)" to probed.sparse,
                 )
 
@@ -109,14 +125,19 @@ class SearchArmAblationTest(
     private fun productionOrder(titles: Map<UUID, String>): Comparator<FusedDocument> =
         compareByDescending<FusedDocument> { it.score }
             .thenByDescending { it.sources.size }
-            .thenBy { document -> document.sources.minOf { EVIDENCE_ORDER.indexOf(it.removeSuffix("(probes)")) } }
-            .thenBy { titles.getValue(it.id) }
+            .thenBy { document ->
+                // indexOf returns -1 for a name this table knows and SearchService does not, which
+                // would win every tie and quietly sort those rows to the top of a published table.
+                document.sources.minOf { source ->
+                    EVIDENCE_ORDER.indexOf(source.substringBefore('(')).also { check(it >= 0) { "Unknown arm $source" } }
+                }
+            }.thenBy { titles.getValue(it.id) }
             .thenBy { it.id }
 
     private companion object {
         const val HIT_AT = 5
 
         /** Most to least literal, as SearchService orders sources. */
-        val EVIDENCE_ORDER = listOf("keyword", "sparse", "semantic")
+        val EVIDENCE_ORDER = listOf("keyword", "phrase", "sparse", "semantic")
     }
 }

@@ -37,6 +37,36 @@ class DocumentSearchRepository(
     fun keywordSearch(
         query: String,
         limit: Int,
+    ): List<DocumentMatch> = fullText(query, limit)
+
+    /**
+     * The same arm, asked for the lexicon's phrases instead of the user's words. Each phrase is
+     * quoted so `websearch_to_tsquery` reads it as an adjacency match rather than a bag of words, and
+     * they are OR-ed: `"supply address" or "account holder"` becomes
+     * `'suppli' <-> 'address' | 'account' <-> 'holder'`, which the electricity bill matches and a
+     * document merely saying "address proof" does not. Stemming still applies, so a document's own
+     * inflection matches.
+     *
+     * A double quote inside a phrase would close the quoted run and change the grammar, so it is
+     * spaced out here, where the query language lives rather than where the lexicon is loaded.
+     */
+    fun phraseSearch(
+        phrases: List<String>,
+        limit: Int,
+    ): List<DocumentMatch> {
+        val query =
+            phrases
+                .mapNotNull { phrase -> phrase.replace('"', ' ').trim().takeIf(String::isNotBlank) }
+                .joinToString(" or ") { "\"$it\"" }
+        // No phrases, no query: a search that reached no concept costs exactly what it did before.
+        if (query.isEmpty()) return emptyList()
+        return fullText(query, limit)
+    }
+
+    /** One statement for both, so the arm cannot drift into two arms that rank differently. */
+    private fun fullText(
+        query: String,
+        limit: Int,
     ): List<DocumentMatch> =
         jdbc
             .sql(

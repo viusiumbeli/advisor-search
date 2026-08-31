@@ -16,18 +16,29 @@ private val log = LoggerFactory.getLogger(SearchService::class.java)
 
 private const val SNIPPET_LENGTH = 240
 private const val KEYWORD = "keyword"
+private const val PHRASE = "phrase"
 private const val SPARSE = "sparse"
 private const val SEMANTIC = "semantic"
+
+/**
+ * The sparse arm pays a full scan per probe — 1-2 ms on the seeded corpus but ~420 ms at 99,700
+ * chunks, where its column is detoasted on the way past — so it gets the same five-probe ceiling the
+ * semantic arm has: the query and at most four of the lexicon's phrases. The lexical arm needs no
+ * such ceiling; one tsquery costs one scan however many alternatives it holds.
+ */
+private const val MAX_SPARSE_PHRASE_PROBES = 4
 
 /** What a document hit says when more than one retriever found it; `sources` then says which. */
 private const val MULTIPLE = "multiple"
 
 /**
  * Most to least literal, used to order `sources` and to break exact fusion ties. A keyword hit is the
- * token in the document; a sparse hit is the token, or a term the model learned the chunk implies,
- * in a chunk's representation; a semantic hit is an estimate of meaning.
+ * token in the document, and the token is one the user typed; a phrase hit is also a token in the
+ * document, adjacency-checked by the same grammar, but the lexicon supplied it rather than the user,
+ * which is the one step that separates them; a sparse hit is the token, or a term the model learned
+ * the chunk implies, in a chunk's representation; a semantic hit is an estimate of meaning.
  */
-private val EVIDENCE_ORDER = listOf(KEYWORD, SPARSE, SEMANTIC)
+private val EVIDENCE_ORDER = listOf(KEYWORD, PHRASE, SPARSE, SEMANTIC)
 
 /** Every retriever the fusion can name must be here: an unknown one would otherwise sort to the top of a tie. */
 private fun evidenceRank(source: String): Int = EVIDENCE_ORDER.indexOf(source).also { check(it >= 0) { "Unknown retriever $source" } }
@@ -55,13 +66,15 @@ class SearchService(
         // Each arm's own time beside its count, so the cost of a retriever is a grep away — and the
         // concepts the query reached, so an expansion is too.
         log.info(
-            "search q='{}' clients={} concepts={} ({}) keyword={} ({}) sparse={} ({}) semantic={} ({}) returned={} in {}",
+            "search q='{}' clients={} concepts={} ({}) keyword={} ({}) phrase={} ({}) sparse={} ({}) semantic={} ({}) returned={} in {}",
             query,
             clientHits.size,
             arms.concepts.joinToString(prefix = "[", postfix = "]") { "${it.concept} ${it.similarity.asScore()} via '${it.phrasing}'" },
             arms.expansionTime,
             arms.keyword.size,
             arms.keywordTime,
+            arms.phrase.size,
+            arms.phraseTime,
             arms.sparse.size,
             arms.sparseTime,
             arms.semantic.size,
@@ -73,23 +86,42 @@ class SearchService(
     }
 
     /**
-     * The three floored document rankings for one query: what fusion combines, and what
+     * The four floored document rankings for one query: what fusion combines, and what
      * `SearchArmAblationTest` measures one arm at a time. The expander embeds the query exactly once
-     * and hands the vector on, so the semantic arm runs no inference of its own. [expandSparse] exists
-     * for that test only — production runs the sparse arm on the bare query. Measured, the probes
-     * changed no golden rank but lengthened pages: a two-word probe like "bank statement" is a strong
-     * partial match for most of the corpus, so "address proof" carried fifteen sparse candidates into
-     * fusion instead of three.
+     * and hands the vector on, so the semantic arm runs no inference of its own.
+     *
+     * Both flags exist for that test. [sparsePhrases] is on in production and turns the lexicon's
+     * phrases into sparse probes; [expandSparse] adds the document *type* names, which stays off,
+     * because measured they changed no golden rank and only lengthened pages — a two-word type name
+     * like "bank statement" is a strong partial match for most of the corpus, so "address proof"
+     * carried fifteen sparse candidates into fusion instead of three.
      */
     internal fun documentArms(
         query: String,
         expandSparse: Boolean = false,
+        sparsePhrases: Boolean = true,
     ): DocumentArms {
         val (expansion, expansionTime) = measureTimedValue { expander.expand(query) }
         val (keyword, keywordTime) = measureTimedValue { findLexically(query) }
-        val (sparse, sparseTime) = measureTimedValue { findSparsely(if (expandSparse) expansion.texts else listOf(query)) }
+        val (phrase, phraseTime) = measureTimedValue { findByPhrase(expansion.phrases, keyword) }
+        val sparseProbes =
+            listOf(query) +
+                (if (sparsePhrases) expansion.phrases.take(MAX_SPARSE_PHRASE_PROBES) else emptyList()) +
+                (if (expandSparse) expansion.texts.drop(1) else emptyList())
+        val (sparse, sparseTime) = measureTimedValue { findSparsely(sparseProbes) }
         val (semantic, semanticTime) = measureTimedValue { findSemantically(expansion.vectors) }
-        return DocumentArms(keyword, sparse, semantic, keywordTime, sparseTime, semanticTime, expansion.concepts, expansionTime)
+        return DocumentArms(
+            keyword,
+            phrase,
+            sparse,
+            semantic,
+            keywordTime,
+            phraseTime,
+            sparseTime,
+            semanticTime,
+            expansion.concepts,
+            expansionTime,
+        )
     }
 
     private fun findClients(
@@ -116,8 +148,41 @@ class SearchService(
     }
 
     /**
+     * What the lexicon's phrases find that the user's own words did not. Its own tsquery, so its own
+     * relative floor: `ts_rank_cd` has no scale that carries between queries, and a different tsquery
+     * is a different query — measured on the seeded corpus, this page's best is 1.20 where the user's
+     * own peaks at 0.83, so one shared floor would cut documents the user's words legitimately found.
+     *
+     * Documents the keyword arm already holds are dropped rather than ranked again: the same index
+     * finding the same document twice is one fact, not two, and fusion counts lists. What is left is
+     * exactly the documents the lexicon added, which is what `sources` then says.
+     *
+     * Re-sorted before it becomes a ranking. A phrase page ties constantly — a hit is typically one
+     * phrase matched once, so its `ts_rank_cd` is the same number for every such document — and the
+     * repository breaks ties by id, which is a fresh uuid on every seeded database. Title first keeps
+     * a rank from depending on which install produced it.
+     */
+    private fun findByPhrase(
+        phrases: List<String>,
+        keyword: List<DocumentMatch>,
+    ): List<DocumentMatch> {
+        if (phrases.isEmpty()) return emptyList()
+        val matches = documents.phraseSearch(phrases, properties.candidateDocuments)
+        val best = matches.maxOfOrNull { it.score } ?: return emptyList()
+        val alreadyFound = keyword.mapTo(mutableSetOf()) { it.reference.id }
+        return matches
+            .filter { it.score >= best * properties.keywordFloorRatio && it.reference.id !in alreadyFound }
+            .sortedWith(
+                compareByDescending<DocumentMatch> { it.score }
+                    .thenBy { it.reference.title }
+                    .thenBy { it.reference.id },
+            )
+    }
+
+    /**
      * The sparse arm: the query's IDF-weighted wordpieces against the learned, expanded chunks. Written
-     * over a list of probes so the ablation can run the lexicon through it, but production passes one.
+     * over a list of probes so the ablation can run the lexicon through it; production passes the query
+     * and the lexicon's first few phrases.
      */
     private fun findSparsely(probes: List<String>): List<DocumentMatch> {
         val best =
@@ -159,16 +224,16 @@ class SearchService(
         arms: DocumentArms,
         limit: Int,
     ): List<DocumentHit> {
-        val (keyword, sparse, semantic) = arms
         // Later entries win, so a document's reference and fallback snippet come from the most
         // literal arm that found it.
-        val byId = (semantic + sparse + keyword).associateBy { it.reference.id }
+        val byId = (arms.semantic + arms.sparse + arms.phrase + arms.keyword).associateBy { it.reference.id }
         val fused =
             ReciprocalRankFusion.fuse(
                 listOf(
-                    RankedList(KEYWORD, keyword.map { it.reference.id }),
-                    RankedList(SPARSE, sparse.map { it.reference.id }),
-                    RankedList(SEMANTIC, semantic.map { it.reference.id }),
+                    RankedList(KEYWORD, arms.keyword.map { it.reference.id }),
+                    RankedList(PHRASE, arms.phrase.map { it.reference.id }),
+                    RankedList(SPARSE, arms.sparse.map { it.reference.id }),
+                    RankedList(SEMANTIC, arms.semantic.map { it.reference.id }),
                 ),
                 properties.rrfK,
             )
@@ -181,7 +246,9 @@ class SearchService(
         // ids, so anything that reordered on id would rank differently from one install to the
         // next. Sorting uses the full-precision score; rounding is presentation and would
         // otherwise manufacture extra ties.
-        val headlines = keyword.associate { it.reference.id to it.snippet }
+        // Both arms return a ts_headline built around what they matched; the user's own words explain
+        // a result better than the lexicon's, so they are added last and win.
+        val headlines = (arms.phrase + arms.keyword).associate { it.reference.id to it.snippet }
         return fused
             .map { item -> Candidate(item, byId.getValue(item.id), EVIDENCE_ORDER.filter { it in item.sources }) }
             .sortedWith(
@@ -196,9 +263,10 @@ class SearchService(
                     score = item.score.asScore(),
                     matchedOn = if (sources.size > 1) MULTIPLE else sources.single(),
                     sources = sources,
-                    // A keyword hit carries a ts_headline built around the query terms, which reads
-                    // better than a whole chunk; any other hit falls back to its best passage — for
-                    // a sparse hit, the chunk whose learned terms the query's own weighed most.
+                    // A keyword or phrase hit carries a ts_headline built around the terms that
+                    // matched, which reads better than a whole chunk; any other hit falls back to its
+                    // best passage — for a sparse hit, the chunk whose learned terms the query's own
+                    // weighed most.
                     snippet = headlines[item.id]?.takeIf { it.isNotBlank() } ?: abbreviate(match.snippet),
                     document = match.reference,
                 )

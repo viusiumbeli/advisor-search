@@ -72,13 +72,14 @@ class QueryExpanderTest(
     }
 
     @Test
-    fun `a query naming one concept runs its own words and the rule's first four expansions, in order`() {
-        // Five probes is the ceiling and the query is always the first, so a rule's fifth expansion
-        // never runs for anyone: list order in the JSON is the budget, and the reach table below is
-        // what that order was read from.
+    fun `a query naming one concept runs its own words and the rule's first four document types, in order`() {
+        // Five probes is the ceiling and the query is always the first, so a rule's fifth document
+        // type never runs for anyone: list order in the JSON is the budget, and the reach table below
+        // is what that order was read from. Document phrases are not in here at all — they cost no
+        // probe, which is the point of the split.
         lexicon.rules.forEach { rule ->
             assertEquals(
-                listOf(rule.concept) + rule.expansions.take(EXPANSIONS_PER_CONCEPT),
+                listOf(rule.concept) + rule.documentTypes.take(TYPES_PER_CONCEPT),
                 expander.expand(rule.concept).texts,
                 rule.concept,
             )
@@ -125,14 +126,14 @@ class QueryExpanderTest(
 
     /**
      * For every rule: the documents its bare concept reaches above the semantic floor, then for each
-     * expansion its top three documents and the documents it adds that the bare concept did not. An
-     * expansion that adds nothing for this corpus is still legitimate — the seeded corpus holds no
+     * document type its top three documents and the documents it adds that the bare concept did not. A
+     * type that adds nothing for this corpus is still legitimate — the seeded corpus holds no
      * payslip — but it goes after the ones that do, because a two-concept query runs only two per rule.
      */
     @Test
-    fun `what each expansion reaches in the seeded corpus, reported`() {
+    fun `what each document type reaches in the seeded corpus, reported`() {
         lexicon.rules.forEach { rule ->
-            val texts = listOf(rule.concept) + rule.expansions
+            val texts = listOf(rule.concept) + rule.documentTypes
             val reached = texts.zip(embeddings.embedQueries(texts)) { text, vector -> text to documents.semanticSearch(vector, CANDIDATES) }
             val bare = reached.first().second.aboveTheFloor()
             println("--- ${rule.concept}: bare concept reaches $bare")
@@ -193,9 +194,34 @@ class QueryExpanderTest(
             it.score >= properties.semanticFloor
         }.map { it.reference.title }.toSet()
 
+    /**
+     * The other half of the lexicon, through the arms that can use it: what each document phrase finds
+     * in the seeded corpus lexically, which is nothing for most of them — the seed holds none of the
+     * documents these phrases come from, and `EvidenceFixtureTest` is where they are proved against
+     * the held-out ones. Printed here so a phrase that starts matching seeded documents is visible.
+     */
+    @Test
+    fun `what each document phrase reaches lexically in the seeded corpus, reported`() {
+        lexicon.rules.forEach { rule ->
+            println("--- ${rule.concept}: ${rule.documentPhrases.size} phrases, first ${SPARSE_PHRASES} to the sparse arm")
+            rule.documentPhrases.forEach { phrase ->
+                val hits = documents.phraseSearch(listOf(phrase), CANDIDATES)
+                println(
+                    "%-46s %s".format(
+                        "'$phrase'",
+                        hits.take(3).joinToString(", ") { "%s %.3f".format(it.reference.title, it.score) }.ifEmpty { "nothing seeded" },
+                    ),
+                )
+            }
+        }
+    }
+
     private companion object {
         /** The query is always the first of five probes. */
-        const val EXPANSIONS_PER_CONCEPT = 4
+        const val TYPES_PER_CONCEPT = 4
+
+        /** What SearchService gives the sparse arm; the lexical arm takes them all in one query. */
+        const val SPARSE_PHRASES = 4
 
         /** Larger than the corpus, so the tables see every document rather than a shortlist. */
         const val CANDIDATES = 400

@@ -218,7 +218,9 @@ as it then stood no rank changed, and a two-word probe like "bank statement" is 
 for most of the corpus, so "address proof" carried fifteen sparse candidates into fusion instead of
 three and the page grew from four documents to ten. With the paraphrase queries added later the same
 column gains 0.02 of MRR (0.860 against 0.841) — recorded in the [fusion table](#fusion), and still
-not worth the pages; the ablation keeps printing it. Expansion widens the semantic arm only.
+not worth the pages; the ablation keeps printing it. What this arm does now take from the lexicon is
+the other list — the document *phrases*, which are the documents' own words rather than their type
+names, and which are what a term-weighted arm can price.
 
 ## Why the task's own example needs more than a model
 
@@ -318,10 +320,30 @@ put liabilities and dependants at 0.77 of each other; pronouns did the same ("va
 investments" made assets win a source-of-funds question about "the money she is investing"). Each was
 reworded without the word and re-measured; the JSON's comment says so.
 
-Expansion widens the **semantic arm only**. The lexical arm's value is precision on exact tokens,
-and OR-ing extra phrases into it would trade that away for recall the semantic arm already provides;
-the sparse arm was measured with the probes and without, and on the golden set of the time they
-changed no rank — only how long the page was ([above](#sparse-learned-term-weights)).
+**Each list widens the arm that can use it.** A rule carries two: `document_types`, what an advisor
+calls the document, and `document_phrases`, text the document itself carries. The types are embedded
+and widen the semantic arm, as they always have. The phrases are never embedded and go to the arms
+that match text, because there the difference is decisive — measured on the seeded corpus:
+
+```
+q='utility bill'    (a type name)          the lexical arm finds only the onboarding checklist (0.48):
+                                            a document never states its own type
+q='supply address'  (a phrase inside it)    the lexical arm finds the electricity bill first (0.40)
+q='address proof'   (the requirement)       becomes address & proof, and the bill says neither
+```
+
+So the older claim here — that expansion widens the semantic arm only, because the lexical arm's
+value is precision on exact tokens — was right about type names and wrong about phrases: a phrase
+from inside the document **is** the exact token that arm exists for. The lexicon's phrases run as one
+extra full-text query, quoted and OR-ed so each is an adjacency match (`"supply address" or "account
+holder"` parses to `'suppli' <-> 'address' | 'account' <-> 'holder'`), and as sparse probes. They
+cost no part of the five-probe ceiling, which is the other half of the point: a phrase is not a scan.
+
+That page is its own ranked list and its own `phrase` source rather than being folded into the
+keyword arm, because a document it finds contains none of the words the user typed, and `matched_on:
+keyword` would say it did. Documents the keyword arm already found are dropped from it — the same
+index finding the same document twice is one fact, not two, and fusion counts lists — so what is left
+is exactly what the lexicon added, and the arithmetic is what folding them would have given anyway.
 
 It is not free, but it is cheaper than it was: the expansions' vectors are embedded at startup, so an
 expanded query pays one forward pass for its own vector — as every query does — and the cost is each
@@ -388,7 +410,48 @@ rule; an official copy of the Land Registry register says "proprietor" and "titl
 | Evidence that the client understands transfer risks | COBS 19.1.1CR(5), 19.1.9AR | the firm's own record; no document type | no |
 | PEP and sanctions status; electronic verification | JMLSG 5.5, 5.3.48 | screening and verification reports carry the requirement's words | no |
 
-**The eleven rules, their sources and their order.** Expansions are the document types a UK adviser's
+**What the documents say: the phrase list.** A rule's second list is text the documents themselves
+carry — `supply address`, `gross pay`, `proprietorship register` — and it exists because the type
+names are worthless to two of the three arms: a document never states its own type. Ninety-one slots
+over eighty-six distinct phrases, three to ten per rule, ordered most discriminating first because
+the sparse arm runs only the first four while the lexical arm takes them all in one scan.
+
+What may appear there is gated, and every gate is a failure measured before it shipped
+(`EvidenceFixtureTest`):
+
+| Gate | What it caught |
+| --- | --- |
+| At least two lexemes after stemming (`numnode(phraseto_tsquery(…)) ≥ 3`) | "it is ordered that" collapses to the single lexeme `order` and reaches unrelated documents; a word count cannot see this, since that is four words and one lexeme while "title absolute" is two words and three nodes |
+| No match against any rule's concept, paraphrases or document types | `firearm certificate` and the type `firearms certificate` both parse to `'firearm' <-> 'certif'`, so a string comparison passes it — and it then returns the onboarding checklist, reproducing the exact type-name failure this split removes. It fired on seven candidates; `ground rent`, `service charge` and `repayment strategy` were dropped rather than excepted |
+| Carried by one of the rule's own documents, and by at most three of the sixty-five in all | Everything shipped is carried by one to three; the first rejections for breadth were `account holder` at five — it outranks the electricity bill on the address page — `direct debit` at eight and `date of birth` at nine |
+| Reaches its carrier through the real arm | Stemming makes carriage and reachability different facts |
+
+Carriage is read from document **content** only: the searchable column weights titles at `A`, and a
+phrase proved by a title this repository wrote proves nothing. As shipped, 80 of the 91 slots are
+carried by exactly one document, 10 by two and 1 by three. The circularity is worth stating: most
+carriers are fixtures written here, so the gates are necessary rather than sufficient — a phrase
+carried by a *seeded* document, written for the original brief, is the independent evidence, and the
+address, income, expenditure, beneficial-ownership and authority rules each have at least one.
+
+| Rule | Phrases | First four (what the sparse arm runs) |
+| --- | --- | --- |
+| evidence of address | 10 | supply address; meter serial number; billing period; sort code |
+| evidence of identity | 9 | date of expiry; given names; holder's signature; machine readable zone |
+| evidence of income | 8 | gross pay; net pay; basic salary; pay in this employment |
+| authority to act for another person | 5 | office of the public guardian; lacks capacity; property and affairs; powers of attorney act |
+| source of funds and source of wealth | 10 | net proceeds of sale; completion date; residue of my estate; gross value of the estate |
+| beneficial ownership of a company or trust | 7 | nature of control; voting rights; class of shares; shareholder information |
+| evidence of property ownership | 9 | proprietorship register; title absolute; charges register; register of title |
+| evidence of assets | 10 | total portfolio value; book cost; unrealised gain; subscriptions this tax year |
+| evidence of liabilities | 8 | amount of credit; consumer credit act; balance outstanding; cash price |
+| evidence of expenditure | 9 | total payments; standing charge; single person discount; sum insured |
+| repayment strategy for an interest-only mortgage | 6 | target amount; projected maturity value; maturity date; surrender value |
+
+What the split does *not* do is free a semantic slot: all 67 existing entries are type names, so the
+budget and the 24 types that never run are exactly as they were. What it buys is that a phrase costs
+no slot at all — the arms that use it charge one shared scan and four probes, not one scan each.
+
+**The eleven rules, their sources and their order.** Document types are the documents a UK adviser's
 file holds as evidence for the requirement, named as a regulator or an adviser names them, in the order
 a client file commonly holds them. Only the first four run for a query naming one concept and two per
 rule for a query naming two (`MAX_PROBES` in `QueryExpander` is five, the query included); the later
@@ -547,15 +610,28 @@ by fusing every combination of the floored arms:
 | Arms | hit@5 | MRR |
 | --- | --- | --- |
 | keyword | 17/34 | 0.500 |
+| phrase | 7/34 | 0.150 |
 | sparse | 26/34 | 0.724 |
 | semantic | 33/34 | 0.789 |
 | keyword + semantic — the two-arm system | 34/34 | 0.780 |
 | keyword + sparse | 26/34 | 0.723 |
-| **keyword + sparse + semantic** | **34/34** | **0.809** |
-| … with the lexicon's probes through the sparse arm too | 34/34 | 0.834 |
+| keyword + sparse + semantic — before the phrases | 34/34 | 0.809 |
+| keyword + phrase + semantic | 34/34 | 0.779 |
+| keyword + phrase + sparse + semantic — phrases in the lexical arm only | 34/34 | **0.856** |
+| **keyword + phrase + sparse(phrases) + semantic** — shipped | **34/34** | **0.849** |
+| … with the type names through the sparse arm too | 34/34 | 0.849 |
 
-Three arms is the only configuration that finds every golden document in the top five with the
-best reciprocal rank; the semantic arm alone misses one and the two-arm system trails by 0.03. The
+The phrase arm alone finds 7 of 34, which is what a precision arm looks like on a corpus that holds
+almost none of the documents its phrases come from — its value is not what it finds alone but which
+document it agrees with, and it took the brief's own example from fifth to first. The last two rows
+are the price of the sparse budget: the lexicon's phrases are probes for that arm too, and each probe
+divides its score by its own mass, so a short phrase's high normalised score raises the ceiling the
+relative floor is taken from and shortens the page. Measured, that costs **0.007 of MRR** — 0.849
+against 0.856 with the phrases in the lexical arm only — and it changes no hit@5. It ships because
+the arm that reads inflections and partial matches is the one a phrase list should reach, and the
+number is here so the decision can be revisited rather than assumed. The
+
+
 eight queries added with the lexicon review are mostly documents that only the lexicon-widened
 semantic arm reaches (the bank statement for "evidence of earnings"), and for those every extra arm can
 only add competitors — a document two arms find outranks one a single arm finds, whatever its position
@@ -612,7 +688,7 @@ statement and two partial sparse matches.
 
 | Set | Queries | hit@5 | MRR |
 | --- | --- | --- | --- |
-| Documents | 34 | 34/34 | 0.809 (0.837 on the 26 before the lexicon review, 0.859 on the original 21) |
+| Documents | 34 | 34/34 | 0.849 (0.809 before the lexicon's phrases reached the lexical and sparse arms, 0.859 on the original 21) |
 | Clients | 7 | 7/7 | 0.929 |
 
 The single client query not at rank 1 is "retired teacher", which ties a retired *teacher* with a
@@ -657,6 +733,14 @@ service" and "burden of proof", at `ts_rank_cd` 0.0047 against the real match's 
 set at **0.05**, inside that gap. This matters more than it looks: reciprocal rank fusion sees a
 document's *position* in a list, not how weak it was, so without the floor a 180-times-weaker
 lexical match arrives at fusion as a first-place finish.
+
+The same ratio floors the lexicon's phrase page, and it is applied **once per tsquery** rather than
+once per query, for the reason the floor is relative in the first place: a different tsquery is a
+different query. Measured on the seeded corpus, the address rule's phrase page peaks at `ts_rank_cd`
+**1.20** where the user's own "proof of address and proof of identity" peaks at **0.83**, so a single
+shared best would put the calibrated 0.05 at 0.072 in the user's units and cut the onboarding
+checklist, at 0.058, out of the arm that legitimately found it — deleting a golden's expected
+document. Two pages, two bests, one ratio.
 
 `SemanticFloorTest` asserts both semantic properties and prints the table.
 

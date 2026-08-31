@@ -137,8 +137,9 @@ Four additions, each because the fragment specifies a shape rather than a whole 
 - **`score`, `matched_on`, `sources` and `snippet` on search hits.** The fragment types search
   results as `type: object`, and a result you cannot explain is hard to trust. `matched_on` is
   `email`, `name`, `description` or `profile` for clients; for documents it names the one retriever
-  that found it — `keyword`, `sparse` or `semantic` — or says `multiple`, and `sources` lists which,
-  most literal first.
+  that found it — `keyword`, `phrase`, `sparse` or `semantic` — or says `multiple`, and `sources`
+  lists which, most literal first. `phrase` means the lexicon's words found it rather than the
+  user's: the token is in the document either way, but the user did not type it.
 - **`POST /demo-corpus`.** Not part of the API the brief describes, and it says so with its own
   `Demo` tag. It exists because a deployed instance that starts empty cannot demonstrate the brief's
   own examples, and asking a reviewer to run the project locally to see them is a worse answer than
@@ -193,14 +194,17 @@ it 13th to 18th, and the learned sparse model 4th, while ranking every other pro
 electricity bill can evidence
 where you live" is procedural knowledge about a domain, not a distributional fact about English, so
 it is stated explicitly in `src/main/resources/search/query-expansions.json`: eleven concepts, each
-with the ways an advisor phrases the requirement and the phrases to also search for. The lexicon
+with the ways an advisor phrases the requirement, the document types to also search for, and the
+phrases those documents carry in their own words. The lexicon
 says *what* to search for; a model decides *when* it applies. Each concept's phrasings are embedded
 once at startup, and a query fires a concept when the vector the semantic arm already computed for
 it comes within a measured distance of one of them — so "something official with her home address on
 it" reaches the bill without containing any listed phrase, where the substring match this replaced
-never could. A matching query runs as several probes — capped at five, semantic arm only, the
-expansions' vectors precomputed — and each document keeps its best score across them; the model's
-say is bounded by two floors that `ConceptFloorTest` holds from both sides.
+never could. A matching query runs the concept's document types as semantic probes — capped at five,
+their vectors precomputed — and each document keeps its best score across them. Its document phrases
+go to the arms that match text instead, where "supply address" is an exact hit on a bill that never
+says "proof": they cost no probe, and a result found that way says `phrase` in its `sources`. The
+model's say is bounded by two floors that `ConceptFloorTest` holds from both sides.
 
 The measurements behind each of these, the SQL, and how every cut-off was calibrated are in
 [search design](docs/search-design.md).
@@ -220,8 +224,8 @@ numbers per combination, which is how the third arm earned its place.
 
 | | |
 | --- | --- |
-| Retrieval quality | documents 34/34 hit@5 (MRR 0.809; 0.837 on the 26 before the lexicon review and 0.859 on the 21 that predate the paraphrase queries, where the two-arm fusion scores 0.810), clients 7/7 (MRR 0.929) |
-| `GET /search`, warm | 17 ms median, 45 ms when a query expands to five probes (68 before the expansions' vectors were precomputed) — the query's one forward pass and the lexicon match are about 3 ms of either, the sparse arm 1–3 ms; the rest is the semantic arm's scans, one per probe |
+| Retrieval quality | documents 34/34 hit@5 (MRR 0.849; 0.809 before the lexicon's phrases reached the lexical and sparse arms, 0.859 on the 21 that predate the paraphrase queries, where the two-arm fusion scores 0.810), clients 7/7 (MRR 0.929) |
+| `GET /search`, warm | 19 ms median, 50 ms when a query expands to five probes (68 before the expansions' vectors were precomputed) — the query's one forward pass and the lexicon match are about 3 ms of either, the phrase arm 1–2 ms and the sparse arm 2–5 ms; the rest is the semantic arm's scans, one per probe |
 | Under concurrency | p95 150 ms at 20 concurrent clients, 115 req/s |
 | Ingest | 0.93 s for a 10 KB document, 6.5 s at the 100,000-character cap — two models per chunk, and past the point at which the design says ingest should go asynchronous |
 | Exact scans | the right choice into the tens of thousands of chunks; at 99,700 the two vector columns share one TOAST relation and each arm's scan pays for both — the large-corpus story now starts with separating them |

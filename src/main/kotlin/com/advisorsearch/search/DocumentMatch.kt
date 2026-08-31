@@ -12,9 +12,12 @@ data class DocumentMatch(
 /** One query's floored document rankings, one per retriever, most literal first, each with what it cost. */
 internal data class DocumentArms(
     val keyword: List<DocumentMatch>,
+    /** What the lexicon's document phrases found and the user's own words did not. */
+    val phrase: List<DocumentMatch>,
     val sparse: List<DocumentMatch>,
     val semantic: List<DocumentMatch>,
     val keywordTime: Duration,
+    val phraseTime: Duration,
     val sparseTime: Duration,
     val semanticTime: Duration,
     /** The lexicon concepts the query reached, strongest first; empty for most queries. */

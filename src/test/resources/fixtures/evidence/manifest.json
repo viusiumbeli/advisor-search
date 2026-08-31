@@ -4,7 +4,9 @@
     "expansion lexicon names and the seeded demo corpus lacks. They are never seeded into the demo; the test",
     "ingests them through the real path inside a transaction that rolls back. Each is written the way the",
     "real document reads (a payslip's fields, a court order's operative words), not toward the probe that",
-    "must find it. `seeded` maps the types the demo corpus already holds to a title substring of that document."
+    "`seeded` maps the types the demo corpus already holds to a title substring of that document. Nothing here",
+    "maps a document phrase: the lexicon's phrases are linked to their carriers by scanning fixture and seed",
+    "content in Postgres, so there is no second map to keep in step with the JSON."
   ],
   "fixtures": [
     {

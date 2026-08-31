@@ -58,7 +58,7 @@ class SearchApiTest(
 
     @Test
     fun `document hits name the retrievers that found them`() {
-        val arms = setOf("keyword", "sparse", "semantic")
+        val arms = setOf("keyword", "phrase", "sparse", "semantic")
 
         listOf("address proof", "PLC-88213", "trustee duties", "double taxation treaty").forEach { query ->
             val hits = search(query).filter { it["type"] == "document" }

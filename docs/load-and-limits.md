@@ -46,6 +46,14 @@ to 115 req/s at seed scale) while per-request latency stretches, which is infere
 than lock contention — the same fact that keeps virtual threads off (see
 [Runtime and data-access choices](operating-notes.md#runtime-and-data-access-choices)).
 
+An expanding query now also carries the lexicon's document phrases, and they are not free at scale:
+one extra full-text scan whatever the phrase count (1–2 ms at seed scale, index-backed), and up to
+four more sparse probes. At seed scale that takes the sparse arm from about 2 ms to 4–5 ms; at 99,700
+chunks, where one sparse scan is about 420 ms, the same budget is what turns that arm into seconds
+rather than half of one. `MAX_SPARSE_PHRASE_PROBES` in `SearchService` is the lever, and the fusion
+table in [search design](search-design.md#fusion) records what those probes are worth: 0.007 of MRR,
+against a lexical-arm-only phrase routing that costs one scan.
+
 The large-corpus rows are the third arm's bill, and it is larger than the sparse scan alone. Before
 the sparse column existed the same rows read 113 ms and 482 ms p50; the sparse arm's own scan at
 99,700 chunks is about 420 ms, but the *dense* scan beside it went from 244 ms to about 520 ms,
